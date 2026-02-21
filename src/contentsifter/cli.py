@@ -499,7 +499,11 @@ def search(ctx, query, semantic, category, tag, date_from, date_to,
 @click.option("--query", "-q", required=True, help="Search query for source material")
 @click.option(
     "--format", "-f", "format_type",
-    type=click.Choice(["linkedin", "newsletter", "thread", "playbook"]),
+    type=click.Choice([
+        "linkedin", "newsletter", "thread", "playbook",
+        "video-script", "carousel",
+        "email-welcome", "email-weekly", "email-sales",
+    ]),
     required=True,
     help="Output format",
 )
@@ -507,15 +511,30 @@ def search(ctx, query, semantic, category, tag, date_from, date_to,
 @click.option("--category", "-c", multiple=True, help="Filter source by category")
 @click.option("--min-quality", type=int, default=3, help="Minimum quality for source material")
 @click.option("--limit", type=int, default=10, help="Max source items to use")
+@click.option("--voice-print/--no-voice-print", "use_voice_print", default=True,
+              help="Use voice print for tone matching (default: on if voice-print.md exists)")
+@click.option("--save", is_flag=True, help="Save draft to content/drafts/")
 @click.pass_context
-def generate(ctx, query, format_type, topic, category, min_quality, limit):
+def generate(ctx, query, format_type, topic, category, min_quality, limit,
+             use_voice_print, save):
     """Generate content drafts from search results."""
+    from datetime import datetime
+
+    from contentsifter.config import DRAFTS_DIR
     from contentsifter.generate.drafts import generate_draft
+    from contentsifter.planning.voiceprint import load_voice_print
     from contentsifter.search.filters import SearchFilters
     from contentsifter.search.keyword import keyword_search
 
     db_path = ctx.obj["db_path"]
     llm = create_client(ctx.obj["llm_mode"], ctx.obj["model"])
+
+    # Load voice print if available and requested
+    voice_print = None
+    if use_voice_print:
+        voice_print = load_voice_print()
+        if voice_print:
+            console.print("[dim]Using voice print for tone matching.[/dim]")
 
     filters = SearchFilters(
         categories=list(category),
@@ -532,13 +551,21 @@ def generate(ctx, query, format_type, topic, category, min_quality, limit):
 
     console.print(f"Found [bold]{len(results)}[/bold] source items. Generating {format_type} draft...")
 
-    draft = generate_draft(results, format_type, llm, topic)
+    save_to = None
+    if save:
+        timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+        save_to = DRAFTS_DIR / f"{format_type}-{timestamp}.md"
+
+    draft = generate_draft(results, format_type, llm, topic,
+                           voice_print=voice_print, save_to=save_to)
 
     console.print()
     console.print("[bold]Generated Draft:[/bold]")
-    console.print("═" * 60)
+    console.print("=" * 60)
     console.print(draft)
-    console.print("═" * 60)
+    console.print("=" * 60)
+    if save_to:
+        console.print(f"\n[green]Saved to:[/green] {save_to}")
 
 
 @cli.command(name="export")
@@ -562,6 +589,111 @@ def export_cmd(ctx, output):
     console.print(f"[green]Exported {summary['total']} extractions to {output_dir}[/green]")
     console.print(f"  By category: {summary['by_category']}")
     console.print(f"  Calls with extractions: {summary['calls_with_extractions']}")
+
+
+# ---------------------------------------------------------------------------
+# Content Planning Commands
+# ---------------------------------------------------------------------------
+
+
+@cli.command(name="init-templates")
+@click.option("--force", is_flag=True, help="Overwrite existing template files")
+@click.pass_context
+def init_templates(ctx, force):
+    """Generate content planning template files in content/templates/."""
+    from contentsifter.planning.templates_static import ALL_TEMPLATES
+    from contentsifter.planning.writer import ensure_content_dirs, write_markdown
+
+    ensure_content_dirs()
+    written = 0
+    skipped = 0
+
+    for name, (path, content) in ALL_TEMPLATES.items():
+        if write_markdown(Path(path), content, force):
+            written += 1
+            console.print(f"  [green]Wrote[/green] {path}")
+        else:
+            skipped += 1
+            console.print(f"  [dim]Skipped[/dim] {path} (exists, use --force)")
+
+    console.print()
+    console.print(f"[green]Done![/green] Wrote {written} template files.")
+    if skipped:
+        console.print(f"[dim]Skipped {skipped} existing files.[/dim]")
+
+
+@cli.command(name="voice-print")
+@click.option("--force", is_flag=True, help="Regenerate even if voice-print.md exists")
+@click.option("--sample-size", type=int, default=100, help="Turns per sample bucket")
+@click.pass_context
+def voice_print_cmd(ctx, force, sample_size):
+    """Analyze coach's speaking patterns and generate a voice profile."""
+    from contentsifter.config import VOICE_PRINT_PATH
+    from contentsifter.planning.voiceprint import (
+        analyze_voice,
+        get_coach_turn_stats,
+        load_voice_print,
+        save_voice_print,
+    )
+
+    if not force and load_voice_print() is not None:
+        console.print(f"[yellow]Voice print already exists:[/yellow] {VOICE_PRINT_PATH}")
+        console.print("Use --force to regenerate.")
+        return
+
+    db_path = ctx.obj["db_path"]
+    llm = create_client(ctx.obj["llm_mode"], ctx.obj["model"])
+
+    with Database(db_path) as db:
+        stats = get_coach_turn_stats(db)
+        console.print(
+            f"Analyzing [bold]{stats['turn_count']:,}[/bold] coach turns "
+            f"across [bold]{stats['call_count']}[/bold] calls..."
+        )
+        console.print("Running 3-pass voice analysis (this takes a few minutes)...")
+        console.print()
+
+        result = analyze_voice(db, llm, sample_per_bucket=sample_size)
+
+    out_path = save_voice_print(result)
+    console.print(f"[green]Voice print saved to:[/green] {out_path}")
+
+
+@cli.command(name="plan-week")
+@click.option("--week-of", type=str, help="Start date (YYYY-MM-DD, defaults to next Monday)")
+@click.option("--topic-focus", type=str, help="Optional tag to emphasize this week")
+@click.option("--no-llm", is_flag=True, help="Generate calendar without LLM drafts")
+@click.pass_context
+def plan_week(ctx, week_of, topic_focus, no_llm):
+    """Generate a weekly content calendar with suggested content for each day."""
+    from contentsifter.planning.calendar import generate_calendar
+
+    db_path = ctx.obj["db_path"]
+    llm = None
+    if not no_llm:
+        llm = create_client(ctx.obj["llm_mode"], ctx.obj["model"])
+
+    with Database(db_path) as db:
+        console.print("Generating weekly content calendar...")
+        if topic_focus:
+            console.print(f"[dim]Topic focus: {topic_focus}[/dim]")
+        if no_llm:
+            console.print("[dim]No-LLM mode: source material only, no drafts.[/dim]")
+        else:
+            console.print("[dim]Generating drafts for each day (this may take a few minutes)...[/dim]")
+        console.print()
+
+        markdown, output_path = generate_calendar(
+            db,
+            week_of=week_of,
+            topic_focus=topic_focus,
+            llm_client=llm,
+            use_llm=not no_llm,
+        )
+
+    console.print(f"[green]Calendar saved to:[/green] {output_path}")
+    console.print()
+    console.print(markdown)
 
 
 if __name__ == "__main__":

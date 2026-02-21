@@ -9,6 +9,14 @@ DEFAULT_DATA_DIR = PROJECT_ROOT / "data"
 DEFAULT_DB_PATH = DEFAULT_DATA_DIR / "contentsifter.db"
 DEFAULT_EXPORTS_DIR = DEFAULT_DATA_DIR / "exports"
 
+# Content planning output directories
+CONTENT_DIR = PROJECT_ROOT / "content"
+TEMPLATES_DIR = CONTENT_DIR / "templates"
+NEWSLETTER_TEMPLATES_DIR = TEMPLATES_DIR / "newsletter"
+CALENDAR_DIR = CONTENT_DIR / "calendar"
+DRAFTS_DIR = CONTENT_DIR / "drafts"
+VOICE_PRINT_PATH = CONTENT_DIR / "voice-print.md"
+
 # Coach identification
 COACH_NAME = "Izzy Piyale-Sheard"
 COACH_EMAIL = "izzy@joinclearcareer.com"
