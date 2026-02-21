@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "contentsifter"
+version = "0.1.0"
+description = "Extract and search coaching call transcripts for content repurposing"
+requires-python = ">=3.10"
+dependencies = [
+    "click>=8.1",
+    "anthropic>=0.39",
+    "rich>=13.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov",
+]
+
+[project.scripts]
+contentsifter = "contentsifter.cli:cli"
+
+[tool.setuptools.packages.find]
+where = ["src"]

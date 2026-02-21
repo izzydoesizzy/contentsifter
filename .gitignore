@@ -17,3 +17,14 @@ Thumbs.db
 
 # Output
 *.log
+
+# Generated data
+data/
+
+# Transcripts (private coaching call data)
+transcripts/
+
+# Python packaging
+*.egg-info/
+dist/
+build/
