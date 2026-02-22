@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}Interview - {{ current_client.name }} - ContentSifter{% endblock %}
+
+{% block content %}
+<div class="mb-8">
+  <h1 class="text-2xl font-semibold text-zinc-900">Voice Capture Interview</h1>
+  <p class="mt-1 text-sm text-zinc-500">Generate and manage interview questionnaires for {{ current_client.name }}</p>
+</div>
+
+<!-- Generate section -->
+<div class="bg-white rounded-xl border border-zinc-200 p-6 mb-6">
+  <h2 class="text-sm font-medium text-zinc-500 uppercase tracking-wider mb-4">Generate Questionnaire</h2>
+  <form hx-post="/{{ current_client.slug }}/interview/generate"
+        hx-target="#questionnaire-result"
+        hx-swap="innerHTML"
+        hx-indicator="#generate-spinner"
+        class="flex flex-wrap items-end gap-4">
+    <div>
+      <label class="block text-xs font-medium text-zinc-500 mb-1">Niche / Industry (optional)</label>
+      <input type="text" name="niche" placeholder="e.g., tech recruiting, healthcare"
+             class="px-3 py-2 text-sm border border-zinc-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 w-64">
+    </div>
+    <button type="submit"
+            class="px-5 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors">
+      {% if questionnaire %}Regenerate{% else %}Generate{% endif %} Questionnaire
+      <span id="generate-spinner" class="htmx-indicator ml-2">
+        <svg class="animate-spin h-4 w-4 inline" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"/>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+        </svg>
+      </span>
+    </button>
+  </form>
+  <div id="questionnaire-result" class="mt-4"></div>
+</div>
+
+<!-- Current questionnaire -->
+<div class="bg-white rounded-xl border border-zinc-200 overflow-hidden mb-6">
+  <div class="px-5 py-3 border-b border-zinc-100 flex items-center justify-between">
+    <h2 class="text-sm font-medium text-zinc-500 uppercase tracking-wider">Current Questionnaire</h2>
+    {% if questionnaire %}
+    <div class="flex items-center gap-3">
+      <span class="text-xs text-zinc-400">{{ question_count }} questions</span>
+      <button onclick="document.getElementById('preview-content').classList.toggle('hidden')"
+              class="text-xs text-indigo-600 hover:text-indigo-800 font-medium">
+        Toggle Preview
+      </button>
+    </div>
+    {% endif %}
+  </div>
+  <div class="px-5 py-4">
+    {% if questionnaire %}
+    <div id="preview-content" class="hidden"
+         hx-get="/{{ current_client.slug }}/interview/preview" hx-trigger="intersect once" hx-swap="innerHTML">
+      <p class="text-sm text-zinc-400">Loading preview...</p>
+    </div>
+    <div id="preview-placeholder">
+      <p class="text-sm text-zinc-600">Questionnaire is ready with {{ question_count }} questions.</p>
+      <p class="text-xs text-zinc-400 mt-1">{{ questionnaire.path }}</p>
+    </div>
+    {% else %}
+    <p class="text-sm text-zinc-400">No questionnaire generated yet. Use the form above to create one.</p>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Interview status -->
+<div class="bg-white rounded-xl border border-zinc-200 p-6">
+  <h2 class="text-sm font-medium text-zinc-500 uppercase tracking-wider mb-4">Interview Transcripts</h2>
+  {% if interview_items > 0 %}
+  <p class="text-sm text-zinc-600">
+    <span class="text-emerald-600 font-medium">{{ interview_items }}</span> transcript{{ "s" if interview_items != 1 }} ingested
+  </p>
+  {% else %}
+  <p class="text-sm text-zinc-400 mb-3">No interview transcripts ingested yet.</p>
+  <a href="/{{ current_client.slug }}/ingest"
+     class="inline-flex items-center gap-2 text-sm text-indigo-600 hover:text-indigo-800 font-medium">
+    Upload a transcript &rarr;
+  </a>
+  {% endif %}
+</div>
+{% endblock %}

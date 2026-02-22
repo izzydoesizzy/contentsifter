@@ -1,0 +1,9 @@
+<div class="mb-6 rounded-lg px-4 py-3 text-sm flex items-center justify-between
+  {% if level == 'success' %}bg-emerald-50 text-emerald-800 border border-emerald-200
+  {% elif level == 'error' %}bg-rose-50 text-rose-800 border border-rose-200
+  {% elif level == 'warning' %}bg-amber-50 text-amber-800 border border-amber-200
+  {% else %}bg-indigo-50 text-indigo-800 border border-indigo-200{% endif %}"
+  data-flash>
+  <span>{{ message }}</span>
+  <button onclick="this.parentElement.remove()" class="ml-4 opacity-50 hover:opacity-100">&times;</button>
+</div>

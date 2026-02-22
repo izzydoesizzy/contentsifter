@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block title %}Upload - {{ current_client.name }} - ContentSifter{% endblock %}
+
+{% block content %}
+<div class="mb-8">
+  <h1 class="text-2xl font-semibold text-zinc-900">Upload Content</h1>
+  <p class="mt-1 text-sm text-zinc-500">Upload markdown or text files to {{ current_client.name }}'s content bank</p>
+</div>
+
+<!-- Upload zone -->
+<div class="bg-white rounded-xl border border-zinc-200 p-6 mb-6">
+  <form hx-post="/{{ current_client.slug }}/ingest/upload"
+        hx-target="#upload-result"
+        hx-swap="innerHTML"
+        hx-encoding="multipart/form-data"
+        hx-indicator="#upload-spinner">
+
+    <!-- Dropzone -->
+    <div id="dropzone" class="dropzone mb-4" onclick="document.getElementById('file-input').click()">
+      <input type="file" id="file-input" name="file" accept=".md,.txt,.csv"
+             class="hidden"
+             onchange="document.getElementById('file-name').textContent = this.files[0]?.name || 'No file selected'">
+      <svg class="w-10 h-10 mx-auto text-zinc-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+      </svg>
+      <p class="text-sm text-zinc-500">
+        <span class="text-indigo-600 font-medium">Click to upload</span> or drag and drop
+      </p>
+      <p class="text-xs text-zinc-400 mt-1">.md, .txt files</p>
+      <p id="file-name" class="text-sm text-indigo-600 font-medium mt-2"></p>
+    </div>
+
+    <!-- Options row -->
+    <div class="flex flex-wrap items-end gap-4">
+      <div>
+        <label class="block text-xs font-medium text-zinc-500 mb-1">Content Type</label>
+        <select name="content_type"
+                class="px-3 py-2 text-sm border border-zinc-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          <option value="other">Auto-detect</option>
+          <option value="linkedin">LinkedIn Posts</option>
+          <option value="email">Emails</option>
+          <option value="newsletter">Newsletter</option>
+          <option value="blog">Blog Post</option>
+          <option value="transcript">Transcript</option>
+        </select>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <input type="checkbox" id="auto-format" name="auto_format" value="true"
+               {% if has_api_key %}checked{% else %}disabled{% endif %}
+               class="rounded border-zinc-300 text-indigo-600 focus:ring-indigo-500">
+        <label for="auto-format" class="text-sm text-zinc-600">
+          Auto-format with AI
+          {% if not has_api_key %}
+          <span class="text-xs text-zinc-400">(set ANTHROPIC_API_KEY to enable)</span>
+          {% endif %}
+        </label>
+      </div>
+
+      <button type="submit"
+              class="px-5 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors">
+        Upload
+        <span id="upload-spinner" class="htmx-indicator ml-2">
+          <svg class="animate-spin h-4 w-4 inline" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"/>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+          </svg>
+        </span>
+      </button>
+    </div>
+  </form>
+
+  <div id="upload-result" class="mt-4"></div>
+</div>
+
+<!-- Recent uploads -->
+<div class="bg-white rounded-xl border border-zinc-200 overflow-hidden">
+  <div class="px-5 py-3 border-b border-zinc-100">
+    <h2 class="text-sm font-medium text-zinc-500 uppercase tracking-wider">Recent Content</h2>
+  </div>
+  <div id="recent-items" hx-get="/{{ current_client.slug }}/ingest/recent" hx-trigger="load" hx-swap="innerHTML">
+    <p class="text-sm text-zinc-400 px-5 py-4">Loading...</p>
+  </div>
+</div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', () => initDropzone('dropzone', 'file-input'));
+</script>
+{% endblock %}

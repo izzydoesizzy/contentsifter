@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-zinc-50">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}ContentSifter{% endblock %}</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/app.css">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] },
+        }
+      }
+    }
+  </script>
+</head>
+<body class="h-full font-sans text-zinc-900 antialiased" hx-boost="true">
+  <div class="flex h-full">
+    <!-- Sidebar -->
+    {% include "components/sidebar.html" %}
+
+    <!-- Main content -->
+    <main class="flex-1 overflow-y-auto ml-60">
+      <div class="max-w-5xl mx-auto px-8 py-8">
+        <!-- Flash messages -->
+        <div id="flash-container">
+          {% if flash_message %}
+          {% with message=flash_message, level=flash_level|default("info") %}
+          {% include "components/flash.html" %}
+          {% endwith %}
+          {% endif %}
+        </div>
+
+        {% block content %}{% endblock %}
+      </div>
+    </main>
+  </div>
+  <script src="/static/app.js"></script>
+</body>
+</html>

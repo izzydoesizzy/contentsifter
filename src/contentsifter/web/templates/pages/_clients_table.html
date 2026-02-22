@@ -1,0 +1,51 @@
+<div id="clients-table">
+  {% if flash_message %}
+  <div class="mb-4 rounded-lg px-4 py-3 text-sm bg-emerald-50 text-emerald-800 border border-emerald-200" data-flash>
+    {{ flash_message }}
+  </div>
+  {% endif %}
+
+  {% if clients %}
+  <div class="bg-white rounded-xl border border-zinc-200 overflow-hidden">
+    <table class="w-full">
+      <thead>
+        <tr class="border-b border-zinc-100">
+          <th class="text-left text-xs font-medium text-zinc-500 uppercase tracking-wider px-5 py-3">Slug</th>
+          <th class="text-left text-xs font-medium text-zinc-500 uppercase tracking-wider px-5 py-3">Name</th>
+          <th class="text-left text-xs font-medium text-zinc-500 uppercase tracking-wider px-5 py-3">Email</th>
+          <th class="text-left text-xs font-medium text-zinc-500 uppercase tracking-wider px-5 py-3">Description</th>
+          <th class="text-center text-xs font-medium text-zinc-500 uppercase tracking-wider px-5 py-3">Default</th>
+          <th class="px-5 py-3"></th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-zinc-50">
+        {% for c in clients %}
+        <tr class="hover:bg-zinc-50 transition-colors">
+          <td class="px-5 py-3">
+            <a href="/{{ c.slug }}" class="text-sm font-medium text-indigo-600 hover:text-indigo-800">{{ c.slug }}</a>
+          </td>
+          <td class="px-5 py-3 text-sm text-zinc-900">{{ c.name }}</td>
+          <td class="px-5 py-3 text-sm text-zinc-500">{{ c.email or "—" }}</td>
+          <td class="px-5 py-3 text-sm text-zinc-500">{{ c.description or "—" }}</td>
+          <td class="px-5 py-3 text-center">
+            {% if c.is_default %}
+            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-emerald-100 text-emerald-800">Default</span>
+            {% else %}
+            <button hx-post="/clients/{{ c.slug }}/default" hx-swap="outerHTML"
+                    class="text-xs text-zinc-400 hover:text-indigo-600 transition-colors">Set default</button>
+            {% endif %}
+          </td>
+          <td class="px-5 py-3 text-right">
+            <a href="/clients/{{ c.slug }}" class="text-xs text-zinc-400 hover:text-zinc-600">Details</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="text-center py-12 text-sm text-zinc-500">
+    No clients yet. Create one above.
+  </div>
+  {% endif %}
+</div>

@@ -1,0 +1,66 @@
+/* ContentSifter custom styles */
+
+/* Dropzone */
+.dropzone {
+  border: 2px dashed #d4d4d8;
+  border-radius: 0.75rem;
+  padding: 2.5rem;
+  text-align: center;
+  transition: all 0.15s ease;
+  cursor: pointer;
+}
+.dropzone:hover,
+.dropzone.drag-over {
+  border-color: #6366f1;
+  background-color: #eef2ff;
+}
+.dropzone.drag-over {
+  border-style: solid;
+}
+
+/* htmx loading indicator */
+.htmx-indicator {
+  display: none;
+}
+.htmx-request .htmx-indicator,
+.htmx-request.htmx-indicator {
+  display: inline-flex;
+}
+
+/* Smooth transitions for htmx swaps */
+.htmx-swapping {
+  opacity: 0;
+  transition: opacity 0.15s ease-out;
+}
+.htmx-settling {
+  opacity: 1;
+  transition: opacity 0.15s ease-in;
+}
+
+/* Spinner animation */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+/* Category badges */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.125rem 0.5rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+.badge-qa { background: #ede9fe; color: #6d28d9; }
+.badge-playbook { background: #dbeafe; color: #1d4ed8; }
+.badge-story { background: #fef3c7; color: #b45309; }
+.badge-testimonial { background: #d1fae5; color: #047857; }
+.badge-linkedin_post { background: #dbeafe; color: #1d4ed8; }
+.badge-email { background: #fce7f3; color: #be185d; }
+.badge-newsletter { background: #e0e7ff; color: #4338ca; }
+.badge-blog { background: #f3e8ff; color: #7e22ce; }
+.badge-transcript { background: #f1f5f9; color: #475569; }
+.badge-other { background: #f4f4f5; color: #71717a; }

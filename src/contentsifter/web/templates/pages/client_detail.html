@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}{{ client.name }} - ContentSifter{% endblock %}
+
+{% block content %}
+<div class="mb-8">
+  <div class="flex items-center gap-3 mb-1">
+    <a href="/clients" class="text-sm text-zinc-400 hover:text-zinc-600">&larr; Clients</a>
+  </div>
+  <h1 class="text-2xl font-semibold text-zinc-900">{{ client.name }}</h1>
+  <p class="mt-1 text-sm text-zinc-500">{{ client.slug }}{% if client.email %} &middot; {{ client.email }}{% endif %}</p>
+</div>
+
+<!-- Client info -->
+<div class="bg-white rounded-xl border border-zinc-200 p-6 mb-6">
+  <h2 class="text-sm font-medium text-zinc-500 uppercase tracking-wider mb-4">Details</h2>
+  <dl class="grid grid-cols-2 gap-4 text-sm">
+    <div>
+      <dt class="text-zinc-400">Slug</dt>
+      <dd class="text-zinc-900 font-medium">{{ client.slug }}</dd>
+    </div>
+    <div>
+      <dt class="text-zinc-400">Email</dt>
+      <dd class="text-zinc-900">{{ client.email or "—" }}</dd>
+    </div>
+    <div>
+      <dt class="text-zinc-400">Description</dt>
+      <dd class="text-zinc-900">{{ client.description or "—" }}</dd>
+    </div>
+    <div>
+      <dt class="text-zinc-400">Database</dt>
+      <dd class="text-zinc-900 text-xs font-mono">{{ client.db_path }}</dd>
+    </div>
+  </dl>
+</div>
+
+<!-- Stats -->
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+  <div class="bg-white rounded-xl border border-zinc-200 p-5">
+    <p class="text-sm text-zinc-500">Extractions</p>
+    <p class="mt-1 text-2xl font-semibold text-zinc-900">{{ summary.extractions }}</p>
+  </div>
+  <div class="bg-white rounded-xl border border-zinc-200 p-5">
+    <p class="text-sm text-zinc-500">Content Items</p>
+    <p class="mt-1 text-2xl font-semibold text-zinc-900">{{ summary.content_items }}</p>
+  </div>
+  <div class="bg-white rounded-xl border border-zinc-200 p-5">
+    <p class="text-sm text-zinc-500">Calls</p>
+    <p class="mt-1 text-2xl font-semibold text-zinc-900">{{ summary.calls }}</p>
+  </div>
+  <div class="bg-white rounded-xl border border-zinc-200 p-5">
+    <p class="text-sm text-zinc-500">Voice Print</p>
+    <p class="mt-1 text-2xl font-semibold {% if summary.has_voice_print %}text-emerald-600{% else %}text-zinc-400{% endif %}">
+      {{ "Active" if summary.has_voice_print else "None" }}
+    </p>
+  </div>
+</div>
+
+<!-- Actions -->
+<div class="flex gap-3">
+  <a href="/{{ client.slug }}"
+     class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors">
+    Go to Dashboard
+  </a>
+  <form method="post" action="/clients/{{ client.slug }}/default">
+    <button type="submit"
+            class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-zinc-700 bg-zinc-100 rounded-lg hover:bg-zinc-200 transition-colors">
+      Set as Default
+    </button>
+  </form>
+</div>
+{% endblock %}

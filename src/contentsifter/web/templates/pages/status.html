@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% block title %}Status - {{ current_client.name }} - ContentSifter{% endblock %}
+
+{% block content %}
+<div class="mb-8">
+  <h1 class="text-2xl font-semibold text-zinc-900">Pipeline Status</h1>
+  <p class="mt-1 text-sm text-zinc-500">Processing progress for {{ current_client.name }}</p>
+</div>
+
+<!-- Stats overview -->
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+  <div class="bg-white rounded-xl border border-zinc-200 p-5">
+    <p class="text-sm text-zinc-500">Calls</p>
+    <p class="mt-1 text-2xl font-semibold text-zinc-900">{{ summary.calls }}</p>
+  </div>
+  <div class="bg-white rounded-xl border border-zinc-200 p-5">
+    <p class="text-sm text-zinc-500">Extractions</p>
+    <p class="mt-1 text-2xl font-semibold text-zinc-900">{{ summary.extractions }}</p>
+  </div>
+  <div class="bg-white rounded-xl border border-zinc-200 p-5">
+    <p class="text-sm text-zinc-500">Content Items</p>
+    <p class="mt-1 text-2xl font-semibold text-zinc-900">{{ summary.content_items }}</p>
+  </div>
+  <div class="bg-white rounded-xl border border-zinc-200 p-5">
+    <p class="text-sm text-zinc-500">Voice Print</p>
+    <p class="mt-1 text-2xl font-semibold {% if summary.has_voice_print %}text-emerald-600{% else %}text-zinc-400{% endif %}">
+      {{ "Active" if summary.has_voice_print else "None" }}
+    </p>
+  </div>
+</div>
+
+<!-- Pipeline progress -->
+{% if pipeline %}
+<div class="bg-white rounded-xl border border-zinc-200 p-6 mb-6">
+  <h2 class="text-sm font-medium text-zinc-500 uppercase tracking-wider mb-4">Transcript Pipeline</h2>
+  <div class="space-y-4">
+    {% for stage_name, stage in pipeline.stages.items() %}
+    <div>
+      <div class="flex items-center justify-between mb-1">
+        <span class="text-sm font-medium text-zinc-700 capitalize">{{ stage_name }}</span>
+        <span class="text-sm text-zinc-500">{{ stage.done }} / {{ stage.total }}</span>
+      </div>
+      <div class="w-full bg-zinc-100 rounded-full h-2.5">
+        <div class="h-2.5 rounded-full transition-all duration-300
+          {% if stage.complete %}bg-emerald-500{% elif stage.pct > 0 %}bg-indigo-500{% else %}bg-zinc-200{% endif %}"
+          style="width: {{ stage.pct }}%"></div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<!-- Content breakdown -->
+{% if summary.extractions_by_cat %}
+<div class="bg-white rounded-xl border border-zinc-200 p-6 mb-6">
+  <h2 class="text-sm font-medium text-zinc-500 uppercase tracking-wider mb-4">Extractions by Category</h2>
+  <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+    {% for cat, cnt in summary.extractions_by_cat.items() %}
+    <div class="flex items-center gap-3 p-3 rounded-lg bg-zinc-50">
+      <span class="badge badge-{{ cat }}">{{ cat }}</span>
+      <span class="text-lg font-semibold text-zinc-900">{{ cnt }}</span>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+{% if summary.content_by_type %}
+<div class="bg-white rounded-xl border border-zinc-200 p-6 mb-6">
+  <h2 class="text-sm font-medium text-zinc-500 uppercase tracking-wider mb-4">Content by Type</h2>
+  <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+    {% for type, cnt in summary.content_by_type.items() %}
+    <div class="flex items-center gap-3 p-3 rounded-lg bg-zinc-50">
+      <span class="badge badge-{{ type }}">{{ type }}</span>
+      <span class="text-lg font-semibold text-zinc-900">{{ cnt }}</span>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<!-- Suggestions -->
+{% if suggestions %}
+<div class="bg-white rounded-xl border border-zinc-200 p-6">
+  <h2 class="text-sm font-medium text-zinc-500 uppercase tracking-wider mb-4">Suggested Next Steps</h2>
+  <ul class="space-y-2">
+    {% for suggestion in suggestions %}
+    <li class="flex items-start gap-2 text-sm text-zinc-600">
+      <span class="text-indigo-500 mt-0.5">&#8226;</span>
+      {{ suggestion }}
+    </li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}
+
+{% if not pipeline and not summary.extractions_by_cat and not summary.content_by_type %}
+<div class="text-center py-12 px-6">
+  <div class="text-zinc-300 mb-4">
+    <svg class="w-12 h-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"/>
+    </svg>
+  </div>
+  <p class="text-sm text-zinc-500 mb-4">No data yet. Upload content or parse transcripts to get started.</p>
+  <a href="/{{ current_client.slug }}/ingest"
+     class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors">
+    Upload Content
+  </a>
+</div>
+{% endif %}
+{% endblock %}

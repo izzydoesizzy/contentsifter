@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block title %}{{ current_client.name }} - ContentSifter{% endblock %}
+
+{% block content %}
+<div class="mb-8">
+  <h1 class="text-2xl font-semibold text-zinc-900">{{ current_client.name }}</h1>
+  <p class="mt-1 text-sm text-zinc-500">{{ current_client.description or current_client.email or current_client.slug }}</p>
+</div>
+
+<!-- Stat cards -->
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+  <div class="bg-white rounded-xl border border-zinc-200 p-5">
+    <p class="text-sm text-zinc-500">Extractions</p>
+    <p class="mt-1 text-2xl font-semibold text-zinc-900">{{ summary.extractions }}</p>
+    {% if summary.extractions_by_cat %}
+    <p class="mt-1 text-xs text-zinc-400">
+      {% for cat, cnt in summary.extractions_by_cat.items() %}{{ cat }} {{ cnt }}{{ ", " if not loop.last }}{% endfor %}
+    </p>
+    {% endif %}
+  </div>
+
+  <div class="bg-white rounded-xl border border-zinc-200 p-5">
+    <p class="text-sm text-zinc-500">Content Items</p>
+    <p class="mt-1 text-2xl font-semibold text-zinc-900">{{ summary.content_items }}</p>
+    {% if summary.total_chars %}
+    <p class="mt-1 text-xs text-zinc-400">{{ "{:,}".format(summary.total_chars) }} chars</p>
+    {% endif %}
+  </div>
+
+  <div class="bg-white rounded-xl border border-zinc-200 p-5">
+    <p class="text-sm text-zinc-500">Parsed Calls</p>
+    <p class="mt-1 text-2xl font-semibold text-zinc-900">{{ summary.calls }}</p>
+  </div>
+
+  <div class="bg-white rounded-xl border border-zinc-200 p-5">
+    <p class="text-sm text-zinc-500">Voice Print</p>
+    <p class="mt-1 text-2xl font-semibold {% if summary.has_voice_print %}text-emerald-600{% else %}text-zinc-400{% endif %}">
+      {{ "Active" if summary.has_voice_print else "None" }}
+    </p>
+    {% if summary.has_questionnaire %}
+    <p class="mt-1 text-xs text-zinc-400">Questionnaire ready</p>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Quick actions -->
+<div class="mb-8">
+  <h2 class="text-sm font-medium text-zinc-500 uppercase tracking-wider mb-3">Quick Actions</h2>
+  <div class="flex flex-wrap gap-3">
+    <a href="/{{ current_client.slug }}/ingest"
+       class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+      Upload Content
+    </a>
+    <a href="/{{ current_client.slug }}/interview"
+       class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 transition-colors">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>
+      Interview Guide
+    </a>
+    <a href="/{{ current_client.slug }}/search"
+       class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 transition-colors">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+      Search Content
+    </a>
+  </div>
+</div>
+
+<!-- Content breakdown -->
+{% if summary.extractions_by_cat or summary.content_by_type %}
+<div class="bg-white rounded-xl border border-zinc-200 p-6">
+  <h2 class="text-sm font-medium text-zinc-500 uppercase tracking-wider mb-4">Content Breakdown</h2>
+
+  {% if summary.extractions_by_cat %}
+  <div class="mb-4">
+    <h3 class="text-xs font-medium text-zinc-400 mb-2">Extractions by Category</h3>
+    <div class="space-y-2">
+      {% for cat, cnt in summary.extractions_by_cat.items() %}
+      <div class="flex items-center gap-3">
+        <span class="badge badge-{{ cat }}">{{ cat }}</span>
+        <div class="flex-1 bg-zinc-100 rounded-full h-2">
+          <div class="bg-indigo-500 h-2 rounded-full" style="width: {{ (cnt / summary.extractions * 100)|int }}%"></div>
+        </div>
+        <span class="text-xs text-zinc-500 w-8 text-right">{{ cnt }}</span>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  {% if summary.content_by_type %}
+  <div>
+    <h3 class="text-xs font-medium text-zinc-400 mb-2">Content by Type</h3>
+    <div class="flex flex-wrap gap-2">
+      {% for type, cnt in summary.content_by_type.items() %}
+      <span class="badge badge-{{ type }}">{{ type }} ({{ cnt }})</span>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% else %}
+{% include "components/empty_state.html" with context %}
+{% set message = "No content yet. Upload files or run an interview to get started." %}
+{% set action_url = "/" ~ current_client.slug ~ "/ingest" %}
+{% set action_label = "Upload Content" %}
+{% endif %}
+{% endblock %}

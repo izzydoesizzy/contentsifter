@@ -1403,5 +1403,27 @@ def plan_week(ctx, week_of, topic_focus, no_llm, skip_gates):
     console.print(markdown)
 
 
+@cli.command()
+@click.option("--host", default="127.0.0.1", help="Host to bind to")
+@click.option("--port", default=8000, type=int, help="Port to listen on")
+@click.option("--reload", is_flag=True, help="Auto-reload on code changes")
+def web(host, port, reload):
+    """Start the web UI."""
+    try:
+        import uvicorn
+    except ImportError:
+        console.print("[red]Web dependencies not installed.[/red]")
+        console.print("Install with: pip install -e \".[web]\"")
+        return
+
+    from contentsifter.web.app import create_app
+
+    app = create_app()
+    console.print(f"[bold]ContentSifter Web UI[/bold]")
+    console.print(f"  http://{host}:{port}")
+    console.print()
+    uvicorn.run(app, host=host, port=port, reload=reload)
+
+
 if __name__ == "__main__":
     cli()
