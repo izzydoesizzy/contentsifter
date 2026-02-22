@@ -28,6 +28,17 @@ contentsifter client info jsmith
 contentsifter client set-default jsmith
 ```
 
+### Workflow Commands
+```bash
+# Guided onboarding: creates client + questionnaire + optional ingest
+contentsifter onboard jsmith --name "Jane Smith" --email jane@example.com
+contentsifter onboard jsmith --name "Jane" -i ./posts.md -t linkedin  # With content ingest
+contentsifter onboard jsmith --name "Jane" --niche "financial planning"  # With niche questions
+
+# Pipeline status: shows everything + suggests next steps
+contentsifter -C jsmith pipeline
+```
+
 ### Per-Client Data Layout
 ```
 data/clients/{slug}/contentsifter.db    # Client's database

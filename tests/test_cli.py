@@ -153,6 +153,86 @@ class TestInterviewCommands:
         assert "not found" in result.output.lower() or result.exit_code != 0
 
 
+class TestOnboardCommand:
+    def test_onboard_creates_client(self, runner, cli_env):
+        tmp_path = cli_env
+        result = runner.invoke(cli, [
+            "onboard", "newclient",
+            "--name", "New Client",
+            "--email", "new@example.com",
+            "--description", "A new client",
+        ])
+        assert result.exit_code == 0
+        assert "Onboarding complete" in result.output
+        assert "Created" in result.output or "created" in result.output
+        assert "Questionnaire saved" in result.output or "questionnaire" in result.output.lower()
+
+    def test_onboard_duplicate_slug(self, runner, cli_env):
+        result = runner.invoke(cli, [
+            "onboard", "testcli",
+            "--name", "Duplicate",
+            "--email", "",
+            "--description", "",
+        ])
+        assert result.exit_code == 0
+        assert "already exists" in result.output
+
+    def test_onboard_with_ingest(self, runner, cli_env):
+        tmp_path = cli_env
+        f = tmp_path / "posts.md"
+        f.write_text("title: Onboard Post\n\nContent from onboarding.")
+        result = runner.invoke(cli, [
+            "onboard", "ingestclient",
+            "--name", "Ingest Client",
+            "--email", "",
+            "--description", "",
+            "--ingest-path", str(f),
+            "--ingest-type", "blog",
+        ])
+        assert result.exit_code == 0
+        assert "Ingested" in result.output
+        assert "1 content item" in result.output or "1" in result.output
+
+    def test_onboard_shows_next_steps(self, runner, cli_env):
+        result = runner.invoke(cli, [
+            "onboard", "stepsclient",
+            "--name", "Steps",
+            "--email", "",
+            "--description", "",
+        ])
+        assert result.exit_code == 0
+        assert "Next steps" in result.output
+        assert "interview ingest" in result.output
+
+
+class TestPipelineCommand:
+    def test_pipeline_no_db(self, runner, cli_env):
+        result = runner.invoke(cli, ["pipeline"])
+        assert result.exit_code == 0
+        assert "No database yet" in result.output or "Pipeline Status" in result.output
+
+    def test_pipeline_with_content(self, runner, cli_env):
+        tmp_path = cli_env
+        # Ingest some content first
+        f = tmp_path / "post.md"
+        f.write_text("title: Pipeline Test\n\nSome content for pipeline testing here.")
+        runner.invoke(cli, ["ingest", str(f), "--type", "blog"])
+        result = runner.invoke(cli, ["pipeline"])
+        assert result.exit_code == 0
+        assert "Content Bank Summary" in result.output or "Pipeline Status" in result.output
+
+    def test_pipeline_suggests_voice_print(self, runner, cli_env):
+        tmp_path = cli_env
+        # Ingest enough content to trigger voice print suggestion
+        for i in range(6):
+            f = tmp_path / f"post{i}.md"
+            f.write_text(f"title: Post {i}\n\nContent number {i} for testing pipeline suggestions.")
+        runner.invoke(cli, ["ingest", str(tmp_path), "--type", "blog"])
+        result = runner.invoke(cli, ["pipeline"])
+        assert result.exit_code == 0
+        assert "voice-print" in result.output
+
+
 class TestSearchCommand:
     def test_search_no_db(self, runner, cli_env):
         """Search when no database exists should still succeed (creates DB on fly)."""

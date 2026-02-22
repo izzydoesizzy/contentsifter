@@ -125,7 +125,23 @@ You should see a list of commands. If you get "command not found", make sure you
 
 ContentSifter supports multiple clients. Each client gets their own database, voice print, and content directory. This means you can manage content for many people from one installation.
 
-### Creating Your First Client
+### Quick Start: Onboard a New Client
+
+The fastest way to set up a new client is the `onboard` command. It creates the client, generates an interview questionnaire, and optionally ingests files — all in one step:
+
+```bash
+contentsifter onboard jsmith --name "Jane Smith" --email jane@example.com
+```
+
+You'll be prompted for any missing details. To also ingest existing content:
+
+```bash
+contentsifter onboard jsmith --name "Jane Smith" -i ./jane-posts.md -t linkedin
+```
+
+### Creating a Client Manually
+
+If you prefer step-by-step control:
 
 ```bash
 contentsifter client create jsmith --name "Jane Smith" --email jane@example.com
@@ -178,6 +194,16 @@ contentsifter status
 ```
 
 The `-C` flag must come **before** the command name, not after it.
+
+### Checking Pipeline Status
+
+The `pipeline` command shows everything about a client's current state — what's been ingested, what's been extracted, whether a voice print exists — and suggests what to do next:
+
+```bash
+contentsifter -C jsmith pipeline
+```
+
+This is the best command to run when you're picking up work on a client after a break.
 
 ---
 

@@ -1011,6 +1011,266 @@ def interview_status(ctx):
 
 
 # ---------------------------------------------------------------------------
+# Workflow Commands (onboard + pipeline)
+# ---------------------------------------------------------------------------
+
+
+def _content_summary(db, client_config) -> dict:
+    """Gather a summary of all content for a client. Returns a dict with counts."""
+    summary = {
+        "content_items": 0,
+        "content_by_type": {},
+        "total_chars": 0,
+        "extractions": 0,
+        "extractions_by_cat": {},
+        "calls": 0,
+        "has_voice_print": client_config.voice_print_path.exists(),
+        "has_questionnaire": (client_config.content_dir / "interview-guide.md").exists(),
+    }
+
+    try:
+        rows = db.conn.execute(
+            "SELECT content_type, COUNT(*) as cnt, COALESCE(SUM(char_count), 0) as chars "
+            "FROM content_items GROUP BY content_type"
+        ).fetchall()
+        for r in rows:
+            summary["content_by_type"][r["content_type"]] = r["cnt"]
+            summary["content_items"] += r["cnt"]
+            summary["total_chars"] += r["chars"]
+    except Exception:
+        pass
+
+    try:
+        rows = db.conn.execute(
+            "SELECT category, COUNT(*) as cnt FROM extractions GROUP BY category"
+        ).fetchall()
+        for r in rows:
+            summary["extractions_by_cat"][r["category"]] = r["cnt"]
+            summary["extractions"] += r["cnt"]
+    except Exception:
+        pass
+
+    try:
+        row = db.conn.execute("SELECT COUNT(*) as cnt FROM calls").fetchone()
+        summary["calls"] = row["cnt"]
+    except Exception:
+        pass
+
+    return summary
+
+
+def _print_content_summary(summary: dict, client_config):
+    """Print a rich summary of a client's content bank."""
+    console.print()
+    console.print(f"[bold]Content Bank Summary[/bold] [dim]({client_config.name})[/dim]")
+    console.print()
+
+    # Status indicators
+    items = []
+    if summary["content_items"] > 0:
+        items.append(f"[green]✓[/green] {summary['content_items']} content items ({summary['total_chars']:,} chars)")
+    if summary["calls"] > 0:
+        items.append(f"[green]✓[/green] {summary['calls']} parsed calls")
+    if summary["extractions"] > 0:
+        items.append(f"[green]✓[/green] {summary['extractions']} extractions")
+        for cat, cnt in sorted(summary["extractions_by_cat"].items()):
+            items.append(f"    {cat}: {cnt}")
+    if summary["has_voice_print"]:
+        items.append(f"[green]✓[/green] Voice print exists")
+    else:
+        items.append(f"[yellow]○[/yellow] No voice print yet")
+    if summary["has_questionnaire"]:
+        items.append(f"[green]✓[/green] Interview questionnaire generated")
+
+    for item in items:
+        console.print(f"  {item}")
+
+    # Suggestion
+    total_source = summary["content_items"] + summary["extractions"]
+    if total_source == 0:
+        console.print("\n  [dim]No source material yet. Ingest content or run an interview.[/dim]")
+    elif not summary["has_voice_print"] and total_source >= 5:
+        console.print(f"\n  [cyan]Suggestion:[/cyan] You have enough material to build a voice print.")
+        console.print(f"  Run: contentsifter -C {client_config.slug} voice-print")
+    elif summary["has_voice_print"]:
+        weeks = max(1, total_source // 6)
+        console.print(f"\n  [cyan]Ready to generate![/cyan] ~{weeks} weeks of content available.")
+        console.print(f"  Run: contentsifter -C {client_config.slug} generate -q \"topic\" -f linkedin")
+
+
+@cli.command()
+@click.argument("slug")
+@click.option("--name", prompt="Client name", help="Client display name")
+@click.option("--email", prompt="Client email (or press Enter to skip)", default="", help="Client email")
+@click.option("--description", prompt="Short description (or press Enter to skip)", default="", help="Short description")
+@click.option("--niche", "-n", default=None, help="Client's niche/industry for targeted interview questions")
+@click.option("--ingest-path", "-i", type=click.Path(exists=True), default=None,
+              help="Optional: path to content files to ingest immediately")
+@click.option("--ingest-type", "-t",
+              type=click.Choice(["linkedin", "email", "newsletter", "blog", "other"]),
+              default=None, help="Content type for ingested files")
+@click.pass_context
+def onboard(ctx, slug, name, email, description, niche, ingest_path, ingest_type):
+    """Guided onboarding for a new client.
+
+    Creates the client, generates an interview questionnaire, and optionally
+    ingests existing content — all in one step.
+    """
+    from contentsifter.interview.generator import generate_questionnaire
+
+    console.print()
+    console.print(f"[bold]Onboarding: {name}[/bold]")
+    console.print()
+
+    # Step 1: Create client
+    console.print("[cyan]Step 1/3:[/cyan] Creating client...")
+    try:
+        config = create_client_config(slug, name, email, description)
+        console.print(f"  [green]✓[/green] Client '{slug}' created")
+        console.print(f"    DB: {config.db_path}")
+        console.print(f"    Content: {config.content_dir}")
+    except ValueError as e:
+        console.print(f"  [red]✗[/red] {e}")
+        return
+
+    # Step 2: Generate interview questionnaire
+    console.print()
+    console.print("[cyan]Step 2/3:[/cyan] Generating interview questionnaire...")
+    output_path = config.content_dir / "interview-guide.md"
+
+    llm = None
+    if niche:
+        try:
+            llm = create_llm_client(ctx.obj["llm_mode"], ctx.obj["model"])
+        except Exception:
+            console.print("  [yellow]No LLM available — skipping niche questions[/yellow]")
+
+    markdown, saved = generate_questionnaire(
+        client_name=name, niche=niche, llm_client=llm, output_path=output_path,
+    )
+    console.print(f"  [green]✓[/green] Questionnaire saved to {saved}")
+
+    # Step 3: Ingest files (optional)
+    if ingest_path:
+        console.print()
+        console.print("[cyan]Step 3/3:[/cyan] Ingesting content...")
+        from contentsifter.ingest.reader import ingest_path as do_ingest
+        with Database(config.db_path) as db:
+            items = do_ingest(db, Path(ingest_path), content_type=ingest_type, author=name)
+        console.print(f"  [green]✓[/green] Ingested {len(items)} content items")
+    else:
+        console.print()
+        console.print("[cyan]Step 3/3:[/cyan] [dim]No files to ingest (use --ingest-path next time)[/dim]")
+
+    # Summary & next steps
+    console.print()
+    console.print("[bold green]Onboarding complete![/bold green]")
+    console.print()
+    console.print("[bold]Next steps:[/bold]")
+    console.print(f"  1. Send the interview guide to {name}:")
+    console.print(f"     {output_path}")
+    console.print(f"  2. After they record answers, ingest the transcript:")
+    console.print(f"     contentsifter -C {slug} interview ingest ./transcript.txt")
+    console.print(f"  3. Or ingest their existing content:")
+    console.print(f"     contentsifter -C {slug} ingest ./posts.md --type linkedin")
+    console.print(f"  4. Build voice print + generate:")
+    console.print(f"     contentsifter -C {slug} voice-print")
+    console.print(f"     contentsifter -C {slug} generate -q \"topic\" -f linkedin")
+    console.print()
+    console.print(f"  Check progress anytime: contentsifter -C {slug} pipeline")
+
+
+@cli.command()
+@click.pass_context
+def pipeline(ctx):
+    """Show full pipeline status and suggest next actions for the current client."""
+    client_config = _get_client_config(ctx)
+    db_path = ctx.obj["db_path"]
+
+    console.print()
+    console.print(f"[bold]Pipeline Status[/bold] [dim]({client_config.name})[/dim]")
+    console.print(f"[dim]Slug: {client_config.slug} | DB: {db_path}[/dim]")
+
+    if not db_path.exists():
+        console.print()
+        console.print("  [yellow]○[/yellow] No database yet")
+        console.print()
+        console.print("[bold]Next step:[/bold] Ingest some content or run an interview.")
+        console.print(f"  contentsifter -C {client_config.slug} interview generate")
+        console.print(f"  contentsifter -C {client_config.slug} ingest ./content.md --type linkedin")
+        return
+
+    with Database(db_path) as db:
+        repo = Repository(db)
+        summary = _content_summary(db, client_config)
+
+        # Pipeline stages table
+        if summary["calls"] > 0:
+            prog = repo.get_progress_summary()
+            table = Table(title="Transcript Pipeline")
+            table.add_column("Stage", style="cyan")
+            table.add_column("Done", justify="right")
+            table.add_column("Total", justify="right")
+            table.add_column("", width=3)
+
+            total = prog["total_calls"]
+            for stage in ["parsed", "chunked", "extracted"]:
+                done = prog["stages"].get(stage, 0)
+                icon = "[green]✓[/green]" if done == total else "[yellow]○[/yellow]"
+                table.add_row(stage.capitalize(), str(done), str(total), icon)
+            console.print()
+            console.print(table)
+
+        # Content summary
+        _print_content_summary(summary, client_config)
+
+        # Actionable suggestions
+        suggestions = []
+
+        if summary["content_items"] == 0 and summary["extractions"] == 0:
+            suggestions.append(
+                f"contentsifter -C {client_config.slug} ingest ./files.md --type linkedin"
+            )
+            if not summary["has_questionnaire"]:
+                suggestions.append(
+                    f"contentsifter -C {client_config.slug} interview generate"
+                )
+
+        if summary["calls"] > 0:
+            prog = repo.get_progress_summary()
+            needs_chunk = prog["stages"].get("parsed", 0) - prog["stages"].get("chunked", 0)
+            needs_extract = prog["stages"].get("chunked", 0) - prog["stages"].get("extracted", 0)
+            if needs_chunk > 0:
+                suggestions.append(
+                    f"contentsifter -C {client_config.slug} chunk  # {needs_chunk} calls need chunking"
+                )
+            if needs_extract > 0:
+                suggestions.append(
+                    f"contentsifter -C {client_config.slug} extract  # {needs_extract} calls need extraction"
+                )
+
+        total_source = summary["content_items"] + summary["extractions"]
+        if not summary["has_voice_print"] and total_source >= 5:
+            suggestions.append(
+                f"contentsifter -C {client_config.slug} voice-print"
+            )
+        elif summary["has_voice_print"] and total_source > 0:
+            suggestions.append(
+                f"contentsifter -C {client_config.slug} generate -q \"topic\" -f linkedin"
+            )
+            suggestions.append(
+                f"contentsifter -C {client_config.slug} plan-week"
+            )
+
+        if suggestions:
+            console.print()
+            console.print("[bold]Suggested next steps:[/bold]")
+            for i, cmd in enumerate(suggestions, 1):
+                console.print(f"  {i}. {cmd}")
+    console.print()
+
+
+# ---------------------------------------------------------------------------
 # Content Planning Commands
 # ---------------------------------------------------------------------------
 
