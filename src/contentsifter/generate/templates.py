@@ -11,7 +11,8 @@ Guidelines:
 - Write in first person as a career coach sharing insights
 - Be conversational but professional
 - Include a call-to-action at the end
-- Do NOT use specific client names — generalize the examples"""
+- Do NOT use specific client names — generalize the examples
+{voice_context}"""
 
 NEWSLETTER_SYSTEM = """\
 You write newsletter sections about career development.
@@ -22,7 +23,8 @@ Guidelines:
 - Use a warm, informative tone
 - End with a key takeaway or actionable tip
 - Write in second person ("you") to address the reader directly
-- Do NOT use specific client names — generalize the examples"""
+- Do NOT use specific client names — generalize the examples
+{voice_context}"""
 
 THREAD_SYSTEM = """\
 You create Twitter/X threads from coaching content.
@@ -34,7 +36,8 @@ Guidelines:
 - Last tweet is a call-to-action or summary
 - Use clear, punchy language
 - Each tweet should work standalone but flow as a narrative
-- Do NOT use specific client names"""
+- Do NOT use specific client names
+{voice_context}"""
 
 PLAYBOOK_SYSTEM = """\
 You create structured playbook documents from coaching advice.
@@ -47,7 +50,8 @@ Guidelines:
 - Include callout tips (> **Tip:** format)
 - Make it actionable and self-contained
 - A reader should be able to follow this without any other context
-- Do NOT use specific client names — generalize the examples"""
+- Do NOT use specific client names — generalize the examples
+{voice_context}"""
 
 VIDEO_SCRIPT_SYSTEM = """\
 You write short-form video scripts (30-60 seconds) for career coaching content.

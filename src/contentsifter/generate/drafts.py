@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
+from contentsifter.generate.gates import load_ai_gate, run_content_gates
 from contentsifter.generate.templates import TEMPLATES
 from contentsifter.llm.client import complete_with_retry
+
+log = logging.getLogger(__name__)
 
 
 def format_source_material(results: list[dict]) -> str:
@@ -42,6 +46,7 @@ def generate_draft(
     topic: str | None = None,
     voice_print: str | None = None,
     save_to: Path | None = None,
+    skip_gates: bool = False,
 ) -> str:
     """Generate a content draft from search results.
 
@@ -52,6 +57,7 @@ def generate_draft(
         topic: Optional topic/title override
         voice_print: Optional voice print content for tone matching
         save_to: Optional path to save the draft as a markdown file
+        skip_gates: If True, skip the AI and voice content gates
     """
     if format_type not in TEMPLATES:
         raise ValueError(f"Unknown format: {format_type}. Choose from: {list(TEMPLATES.keys())}")
@@ -74,6 +80,14 @@ def generate_draft(
     )
 
     draft = response.content
+
+    # Run content gates (AI detection + voice matching)
+    if not skip_gates and voice_print:
+        log.info("Running content gates on %s draft...", format_type)
+        ai_gate_doc = load_ai_gate()
+        draft = run_content_gates(
+            draft, llm_client, voice_print=voice_print, ai_gate_doc=ai_gate_doc
+        )
 
     if save_to:
         save_to.parent.mkdir(parents=True, exist_ok=True)

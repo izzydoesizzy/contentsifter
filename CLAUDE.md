@@ -32,9 +32,11 @@ contentsifter search "query" --semantic         # Semantic search
 contentsifter generate -q "topic" -f linkedin   # Generate drafts
 contentsifter generate -q "topic" -f video-script --save  # Generate + save to content/drafts/
 contentsifter generate -q "topic" -f carousel --no-voice-print  # Without voice matching
+contentsifter generate -q "topic" -f linkedin --skip-gates     # Skip content gates
 contentsifter voice-print                       # Generate voice profile from coach's speaking patterns
 contentsifter plan-week                         # Full weekly calendar with LLM-generated drafts
 contentsifter plan-week --topic-focus networking  # Focus on a specific tag
+contentsifter plan-week --skip-gates            # Skip content gates for faster generation
 ```
 
 ## Running Extraction via Claude Code
@@ -75,6 +77,13 @@ process_calls(call_ids=[3,4,5], llm_client=llm)
 
 ### Generate Format Options
 `linkedin`, `newsletter`, `thread`, `playbook`, `video-script`, `carousel`, `email-welcome`, `email-weekly`, `email-sales`
+
+### Content Gates
+Every generated draft passes through two validation gates (in order):
+1. **AI Gate** (`content/ai-gate.md`) — Catches and rewrites AI-sounding patterns (em dashes, hedging, five-dollar words, formulaic structure)
+2. **Voice Gate** (`content/voice-print.md`) — Rewrites to match Izzy's voice (tone, vocabulary, sentence patterns, energy)
+
+Gates run automatically when voice print is enabled. Use `--skip-gates` to bypass for faster generation.
 
 ## Data Format
 Transcripts use Python dict literals for speaker turns — must use `ast.literal_eval`, NOT `json.loads` (data has `None` not `null`).

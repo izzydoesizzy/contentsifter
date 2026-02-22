@@ -229,6 +229,7 @@ def generate_calendar(
     topic_focus: str | None = None,
     llm_client=None,
     use_llm: bool = True,
+    skip_gates: bool = False,
 ) -> tuple[str, Path]:
     """Generate a weekly content calendar.
 
@@ -258,6 +259,7 @@ def generate_calendar(
                     llm_client,
                     topic=items[0]["title"],
                     voice_print=voice_print,
+                    skip_gates=skip_gates,
                 )
                 drafts[day_name] = draft
             except Exception as e:

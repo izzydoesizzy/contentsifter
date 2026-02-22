@@ -514,9 +514,10 @@ def search(ctx, query, semantic, category, tag, date_from, date_to,
 @click.option("--voice-print/--no-voice-print", "use_voice_print", default=True,
               help="Use voice print for tone matching (default: on if voice-print.md exists)")
 @click.option("--save", is_flag=True, help="Save draft to content/drafts/")
+@click.option("--skip-gates", is_flag=True, help="Skip AI detection and voice matching gates")
 @click.pass_context
 def generate(ctx, query, format_type, topic, category, min_quality, limit,
-             use_voice_print, save):
+             use_voice_print, save, skip_gates):
     """Generate content drafts from search results."""
     from datetime import datetime
 
@@ -556,8 +557,12 @@ def generate(ctx, query, format_type, topic, category, min_quality, limit,
         timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
         save_to = DRAFTS_DIR / f"{format_type}-{timestamp}.md"
 
+    if not skip_gates and voice_print:
+        console.print("[dim]Content gates enabled (AI detection + voice matching).[/dim]")
+
     draft = generate_draft(results, format_type, llm, topic,
-                           voice_print=voice_print, save_to=save_to)
+                           voice_print=voice_print, save_to=save_to,
+                           skip_gates=skip_gates)
 
     console.print()
     console.print("[bold]Generated Draft:[/bold]")
@@ -663,8 +668,9 @@ def voice_print_cmd(ctx, force, sample_size):
 @click.option("--week-of", type=str, help="Start date (YYYY-MM-DD, defaults to next Monday)")
 @click.option("--topic-focus", type=str, help="Optional tag to emphasize this week")
 @click.option("--no-llm", is_flag=True, help="Generate calendar without LLM drafts")
+@click.option("--skip-gates", is_flag=True, help="Skip AI detection and voice matching gates")
 @click.pass_context
-def plan_week(ctx, week_of, topic_focus, no_llm):
+def plan_week(ctx, week_of, topic_focus, no_llm, skip_gates):
     """Generate a weekly content calendar with suggested content for each day."""
     from contentsifter.planning.calendar import generate_calendar
 
@@ -681,6 +687,8 @@ def plan_week(ctx, week_of, topic_focus, no_llm):
             console.print("[dim]No-LLM mode: source material only, no drafts.[/dim]")
         else:
             console.print("[dim]Generating drafts for each day (this may take a few minutes)...[/dim]")
+            if not skip_gates:
+                console.print("[dim]Content gates enabled (AI detection + voice matching).[/dim]")
         console.print()
 
         markdown, output_path = generate_calendar(
@@ -689,6 +697,7 @@ def plan_week(ctx, week_of, topic_focus, no_llm):
             topic_focus=topic_focus,
             llm_client=llm,
             use_llm=not no_llm,
+            skip_gates=skip_gates,
         )
 
     console.print(f"[green]Calendar saved to:[/green] {output_path}")
