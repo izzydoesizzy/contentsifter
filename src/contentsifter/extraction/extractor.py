@@ -8,9 +8,11 @@ import re
 
 from contentsifter.extraction.categories import TAGS
 from contentsifter.extraction.prompts import (
-    EXTRACTION_SYSTEM_PROMPT,
+    CONTENT_EXTRACTION_USER_PROMPT,
     EXTRACTION_USER_PROMPT,
     format_turns_compact,
+    get_content_extraction_system_prompt,
+    get_extraction_system_prompt,
 )
 from contentsifter.llm.client import complete_with_retry
 from contentsifter.storage.models import Extraction
@@ -43,6 +45,8 @@ def extract_from_chunk(
     topic_title: str,
     topic_summary: str,
     llm_client,
+    coach_name: str = "",
+    coach_email: str = "",
 ) -> list[Extraction]:
     """Extract categorized content from a topic chunk's turns."""
     formatted = format_turns_compact(turns)
@@ -51,15 +55,45 @@ def extract_from_chunk(
     if len(turns) < 3 or len(formatted) < 100:
         return []
 
+    system_prompt = get_extraction_system_prompt(coach_name, coach_email)
+
     response = complete_with_retry(
         llm_client,
-        system=EXTRACTION_SYSTEM_PROMPT,
+        system=system_prompt,
         user=EXTRACTION_USER_PROMPT.format(
             call_type=call_type,
             date=call_date,
             topic=topic_title,
             summary=topic_summary or "No summary available",
             transcript=formatted,
+        ),
+    )
+
+    return _parse_extractions(response.content)
+
+
+def extract_from_content_item(
+    item: dict,
+    llm_client,
+    author_name: str = "",
+) -> list[Extraction]:
+    """Extract categorized content from a content item (LinkedIn post, email, etc.)."""
+    text = item.get("text", "")
+
+    # Skip very short items
+    if len(text) < 50:
+        return []
+
+    system_prompt = get_content_extraction_system_prompt(author_name)
+
+    response = complete_with_retry(
+        llm_client,
+        system=system_prompt,
+        user=CONTENT_EXTRACTION_USER_PROMPT.format(
+            content_type=item.get("content_type", "other"),
+            date=item.get("date", "unknown"),
+            title=item.get("title", "Untitled"),
+            text=text,
         ),
     )
 

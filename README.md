@@ -1,458 +1,795 @@
 # ContentSifter
 
-A Python CLI tool that extracts searchable content from coaching call transcripts and generates draft content for repurposing. Built for the [ClearCareer](https://joinclearcareer.com) career coaching program.
+A CLI tool that turns any creator's existing content into a searchable content bank and generates publication-ready drafts that sound like they wrote it themselves.
 
-ContentSifter processes raw transcript files through an AI-powered pipeline that identifies topics, extracts valuable content (Q&As, playbooks, testimonials, stories), and stores everything in a searchable SQLite database with full-text search.
+You give it someone's LinkedIn posts, emails, newsletters, blog posts, or call transcripts. It learns how they write. Then it generates new content in their voice across 9 formats.
 
-## What It Does
+Built for the [ClearCareer](https://joinclearcareer.com) program, now extended to support multiple clients.
 
-1. **Parses** merged markdown transcript files into individual call records
-2. **Chunks** each call into topic segments using Claude AI
-3. **Extracts** reusable content: Q&As, playbooks, testimonials, and stories
-4. **Searches** the content bank via keyword (FTS5) or semantic (Claude-powered) search
-5. **Generates** draft content in multiple formats (LinkedIn posts, newsletters, threads, playbooks)
+## How It Works
+
+ContentSifter has two modes depending on what kind of content you're working with:
+
+### Mode 1: Transcripts (coaching calls, meetings, podcasts)
+
+```
+Transcripts (.md files)
+       |
+ [PARSE] --> individual calls, metadata, speaker turns
+       |
+ [CHUNK] --> Claude identifies topic segments
+       |
+[EXTRACT] --> Q&As, playbooks, testimonials, stories
+       |
+[SEARCH] --> keyword (FTS5) or semantic (Claude re-ranking)
+       |
+[GENERATE] --> 9 content formats + voice-print matching
+       |
+ [GATES] --> AI detection rewrite + voice matching rewrite
+       |
+ Final draft (LinkedIn post, newsletter, video script, etc.)
+```
+
+### Mode 2: Written Content (LinkedIn posts, emails, blogs)
+
+```
+Content files (.md or .txt)
+       |
+ [INGEST] --> individual content items stored in database
+       |
+[VOICE-PRINT] --> Claude analyzes writing patterns
+       |
+[GENERATE] --> 9 content formats + voice-print matching
+       |
+ [GATES] --> AI detection rewrite + voice matching rewrite
+       |
+ Final draft (LinkedIn post, newsletter, video script, etc.)
+```
+
+### Mode 3: Voice Capture Interview (no existing content needed)
+
+```
+[INTERVIEW GENERATE] --> 85+ question questionnaire (9 categories)
+       |
+ Client records answers with any voice transcription tool
+       |
+[INTERVIEW INGEST] --> parses transcript, matches Q&A pairs
+       |
+[VOICE-PRINT] --> Claude analyzes speaking patterns
+       |
+[GENERATE] --> 9 content formats + voice-print matching
+       |
+ [GATES] --> AI detection rewrite + voice matching rewrite
+       |
+ Final draft (LinkedIn post, newsletter, video script, etc.)
+```
+
+All three modes produce the same output: drafts that sound like the person actually wrote them. Mode 3 is ideal for new clients who don't have existing written content — they just talk.
+
+---
 
 ## Quick Start
 
-### Prerequisites
+### What You Need
 
-- Python 3.10+
-- [Anthropic API key](https://console.anthropic.com/) (for AI-powered commands)
+- **Python 3.10 or higher.** Check with `python3 --version`. If you don't have it, install it from [python.org](https://www.python.org/downloads/).
+- **An Anthropic API key** (for AI-powered commands like voice-print, generate, and extract). Get one at [console.anthropic.com](https://console.anthropic.com/). You can skip this if you only need to parse, search, and export.
 
-### Installation
+### Step 1: Clone and Install
+
+Open your terminal and run these commands one at a time:
 
 ```bash
-# Clone the repository
+# Download the project
 git clone https://github.com/yourusername/contentsifter.git
+
+# Move into the project folder
 cd contentsifter
 
-# Create a virtual environment
-python -m venv venv
-source venv/bin/activate  # macOS/Linux
-# or: venv\Scripts\activate  # Windows
+# Create a virtual environment (keeps dependencies separate from your system Python)
+python3 -m venv venv
 
-# Install the package in editable mode
+# Activate the virtual environment
+# On macOS/Linux:
+source venv/bin/activate
+# On Windows:
+# venv\Scripts\activate
+
+# Install ContentSifter and its dependencies
 pip install -e .
-
-# Set your API key (required for AI commands)
-export ANTHROPIC_API_KEY="your-key-here"
 ```
 
-### Verify installation
+### Step 2: Set Your API Key
+
+If you plan to use AI-powered commands (voice-print, generate, extract, chunk, semantic search):
+
+```bash
+# Add this to your shell profile (~/.zshrc or ~/.bashrc) so it persists:
+export ANTHROPIC_API_KEY="sk-ant-your-key-here"
+
+# Or set it just for this session:
+export ANTHROPIC_API_KEY="sk-ant-your-key-here"
+```
+
+### Step 3: Verify It Works
 
 ```bash
 contentsifter --help
 ```
 
-## Usage
+You should see a list of commands. If you get "command not found", make sure your virtual environment is activated (you should see `(venv)` at the start of your terminal prompt).
 
-### Step 1: Parse transcripts into the database
+---
 
-Place your merged markdown transcript files in the `transcripts/` directory, then run:
+## Working with Clients
+
+ContentSifter supports multiple clients. Each client gets their own database, voice print, and content directory. This means you can manage content for many people from one installation.
+
+### Creating Your First Client
 
 ```bash
-contentsifter parse --input ./transcripts/
+contentsifter client create jsmith --name "Jane Smith" --email jane@example.com
 ```
 
-This reads all `.md` files, splits them on `<!-- SOURCE FILE: ... -->` markers, parses metadata (date, title, participants, call type) and speaker turns, and stores everything in the SQLite database at `data/contentsifter.db`.
+This does three things:
+1. Registers Jane in the client registry (`clients.json`)
+2. Creates a database at `data/clients/jsmith/contentsifter.db`
+3. Creates a content directory at `content/clients/jsmith/`
 
-**What gets stored:** Each call's title, date, type, participants, and every speaker turn with timestamps.
-
-### Step 2: Run the AI extraction pipeline
-
-You can run each stage individually or all at once:
+### Seeing All Your Clients
 
 ```bash
-# All-in-one: parse + chunk + extract
-contentsifter sift --input ./transcripts/
-
-# Or run stages separately:
-contentsifter chunk      # Topic segmentation via Claude
-contentsifter extract    # Content extraction from chunks
+contentsifter client list
 ```
 
-**What happens:**
-- **Chunking** sends each transcript to Claude to identify topic segments (e.g., "LinkedIn profile optimization", "handling interview rejection")
-- **Extraction** processes each topic chunk and pulls out categorized content items with quality scores
+This shows a table of every client, their email, and which one is set as the default.
 
-### Step 3: Check progress
+### Getting Details About a Client
 
 ```bash
+contentsifter client info jsmith
+```
+
+This shows the client's database path, content directory, how many items have been ingested, and whether a voice print exists.
+
+### Setting a Default Client
+
+If you're working with one client all day, set them as the default so you don't have to type `-C jsmith` on every command:
+
+```bash
+contentsifter client set-default jsmith
+```
+
+Now `contentsifter status` is the same as `contentsifter -C jsmith status`.
+
+### Switching Between Clients
+
+Use the `-C` flag (capital C) before any command to target a specific client:
+
+```bash
+# Work with Jane
+contentsifter -C jsmith status
+
+# Work with another client
+contentsifter -C acme status
+
+# Work with the default client (no flag needed)
 contentsifter status
 ```
 
-Shows a progress table with counts for each pipeline stage (parsed, chunked, extracted) and a breakdown of extractions by category.
-
-### Step 4: Search your content bank
-
-```bash
-contentsifter search "linkedin"
-```
-
-See the [Search Reference](#search-reference) below for all search options.
-
-### Step 5: Generate content drafts
-
-```bash
-contentsifter generate -q "networking tips" -f linkedin
-```
-
-See the [Generate Reference](#generate-reference) below for all format options.
+The `-C` flag must come **before** the command name, not after it.
 
 ---
 
-## Command Reference
+## Ingesting Content
 
-### Global Options
+This is how you get a client's content into ContentSifter. The process depends on what kind of content they have.
 
-Every command supports these options:
+### LinkedIn Posts
 
-| Option | Default | Description |
-|--------|---------|-------------|
-| `--db PATH` | `data/contentsifter.db` | Path to the SQLite database |
-| `--llm-mode [auto\|api\|claude-code]` | `auto` | How to access Claude (`auto` tries API key first) |
-| `--model MODEL` | `claude-sonnet-4-20250514` | Claude model to use |
-| `-v, --verbose` | off | Enable debug logging |
+Create a markdown file with their posts separated by `---` dividers:
 
-### `parse` — Import transcripts
+```markdown
+date: 2026-01-15
+title: The Power of Showing Up
 
-```bash
-contentsifter parse --input ./transcripts/
-contentsifter parse --input ./transcripts/specific-file.md
-```
+I had the same conversation three times this week.
 
-| Option | Required | Description |
-|--------|----------|-------------|
-| `-i, --input PATH` | Yes | Transcript file or directory to parse |
+"I know I should be networking, but I just... can't."
 
-Idempotent — re-running skips already-parsed calls.
-
-### `chunk` — Topic segmentation (requires AI)
-
-```bash
-contentsifter chunk                  # Process all un-chunked calls
-contentsifter chunk --call-id 42     # Process a specific call
-contentsifter chunk --limit 10       # Process up to 10 calls
-contentsifter chunk --force          # Re-process already chunked calls
-```
-
-| Option | Description |
-|--------|-------------|
-| `--call-id INT` | Process a specific call by ID |
-| `--limit INT` | Max number of calls to process |
-| `--force` | Re-process already chunked calls |
-
-### `extract` — Content extraction (requires AI)
-
-```bash
-contentsifter extract                # Process all chunked-but-not-extracted calls
-contentsifter extract --call-id 42   # Extract from a specific call
-contentsifter extract --limit 5      # Process up to 5 calls
-```
-
-Same options as `chunk`.
-
-### `sift` — Full pipeline (parse + chunk + extract)
-
-```bash
-contentsifter sift --input ./transcripts/
-contentsifter sift --input ./transcripts/ --limit 10
-contentsifter sift --dry-run         # Preview what would be processed
-```
-
-| Option | Description |
-|--------|-------------|
-| `-i, --input PATH` | Transcript directory (triggers parse step) |
-| `--limit INT` | Max calls per stage |
-| `--dry-run` | Show what would be processed without doing it |
-
-### `status` — Processing progress
-
-```bash
-contentsifter status
-```
-
-No options. Shows pipeline progress and extraction category counts.
-
-### `stats` — Database statistics
-
-```bash
-contentsifter stats
-```
-
-Shows detailed breakdowns: calls by type, date range, total speaker turns, and top tags.
-
-### `export` — JSON export
-
-```bash
-contentsifter export                            # Export to default location
-contentsifter export --output ./my-exports/     # Custom output directory
-```
-
-| Option | Default | Description |
-|--------|---------|-------------|
-| `-o, --output PATH` | `data/exports/` | Output directory |
-
-Creates three outputs:
-- `full_export.json` — all extractions in a single file
-- `by_category/` — one JSON file per category (qa.json, playbook.json, etc.)
-- `by_call/` — one JSON file per call with its extractions
+Here's what I tell everyone: you don't need to be good at networking.
+You just need to show up.
 
 ---
 
-## Search Reference
+date: 2026-01-20
+title: Your Resume Is an Ad
 
-### Basic keyword search
-
-```bash
-contentsifter search "linkedin"
+Stop treating your resume like a job description.
+It's not a list of responsibilities. It's an AD.
 ```
 
-Uses SQLite FTS5 full-text search with Porter stemming. Matches against extraction titles, content, raw quotes, and context notes.
-
-### Semantic search (requires AI)
+Then ingest it:
 
 ```bash
-contentsifter search "how do I deal with being ghosted after interviews" --semantic
+contentsifter -C jsmith ingest ./jane-linkedin-posts.md --type linkedin
 ```
 
-Expands your query using Claude, runs multiple FTS5 searches, then re-ranks results by relevance using Claude. Better for natural language questions.
+Each section between `---` dividers becomes one content item in the database. The `date:` and `title:` lines at the top of each section are optional but helpful for organizing later.
 
-### Filter options
+### Emails and Newsletters
 
-| Option | Description | Example |
-|--------|-------------|---------|
-| `-c, --category CAT` | Filter by content category | `-c playbook -c qa` |
-| `-t, --tag TAG` | Filter by tag | `-t linkedin -t networking` |
-| `--date-from DATE` | Calls from this date | `--date-from 2024-06-01` |
-| `--date-to DATE` | Calls up to this date | `--date-to 2024-12-31` |
-| `--call-type TYPE` | Filter by call type | `--call-type group_qa` |
-| `--min-quality INT` | Minimum quality score (1-5) | `--min-quality 4` |
-| `--limit INT` | Max results (default: 20) | `--limit 50` |
-| `--output-format FMT` | `table`, `json`, or `full` | `--output-format full` |
-
-### Output formats
-
-- **`table`** (default) — compact table with category, quality score, title, date, tags
-- **`full`** — complete content with raw quotes and metadata
-- **`json`** — raw JSON output for piping to other tools
-
-### Search examples
+Same format. Put each email in its own section separated by `---`:
 
 ```bash
-# Find all high-quality playbooks about LinkedIn
-contentsifter search "linkedin" -c playbook --min-quality 4
-
-# Find testimonials from group Q&A calls
-contentsifter search "landed" -c testimonial --call-type group_qa
-
-# Find networking advice from 2024
-contentsifter search "networking" --date-from 2024-01-01 --date-to 2024-12-31
-
-# Semantic search for complex questions
-contentsifter search "what should I do when a recruiter stops responding" --semantic
-
-# Get full details including raw quotes
-contentsifter search "resume" --output-format full --limit 5
-
-# Export search results as JSON
-contentsifter search "salary" --output-format json > salary_results.json
-
-# Combine multiple filters
-contentsifter search "interview" -c playbook -c qa -t interviews --min-quality 3 --limit 30
+contentsifter -C jsmith ingest ./jane-emails.md --type email
 ```
 
-### Available categories
+Or if each newsletter is its own file, point to the directory:
 
-| Category | Key | Description |
-|----------|-----|-------------|
-| Q&A | `qa` | Questions asked and answers given |
-| Testimonial | `testimonial` | Success stories, wins, positive feedback |
-| Playbook | `playbook` | Step-by-step advice, frameworks, methodologies |
-| Story | `story` | Personal stories, anecdotes, illustrative examples |
+```bash
+contentsifter -C jsmith ingest ./jane-newsletters/ --type newsletter
+```
 
-### Available tags
+With `--type newsletter`, each file becomes one content item (no splitting on `---`).
 
-| Tag | Description |
-|-----|-------------|
-| `linkedin` | LinkedIn profile, posting, networking on LinkedIn |
-| `networking` | Networking strategy, events, connections |
-| `resume` | Resume writing, formatting, tailoring |
-| `interviews` | Interview preparation, techniques, follow-up |
-| `cover_letter` | Cover letter writing |
-| `salary_negotiation` | Salary negotiation, compensation discussion |
-| `mindset` | Mindset, motivation, overcoming doubt |
-| `confidence` | Building confidence, self-advocacy |
-| `personal_branding` | Personal brand, differentiation |
-| `career_transition` | Changing careers, pivoting industries |
-| `job_search_strategy` | Overall job search approach, planning |
-| `follow_up` | Following up with contacts, applications |
-| `company_research` | Researching companies, due diligence |
-| `recruiter` | Working with recruiters |
-| `informational_interview` | Informational interviews, coffee chats |
-| `remote_work` | Remote work, hybrid arrangements |
-| `portfolio` | Portfolio, work samples |
-| `references` | References, recommendations |
-| `onboarding` | Starting a new role |
-| `rejection_handling` | Handling rejection, ghosting |
-| `time_management` | Time management, productivity |
-| `ai_tools` | AI tools for job search |
-| `volunteer` | Volunteering, pro bono work |
-| `entrepreneurship` | Entrepreneurship, starting a business |
-| `freelancing` | Freelancing, contract work |
+### Blog Posts
 
-### Available call types
+Same as newsletters. Each file is one blog post:
 
-| Call Type | Description |
-|-----------|-------------|
-| `group_qa` | Weekly group Q&A sessions |
-| `group_call` | General group calls |
-| `discovery` | Introductory discovery calls |
-| `coaching` | 1-on-1 coaching calls |
-| `workshop` | Workshops (Ask a Recruiter, Career Storytelling, etc.) |
-| `body_doubling` | Body doubling co-working sessions |
-| `welcome` | New member welcome calls |
-| `onboarding` | Onboarding calls |
+```bash
+contentsifter -C jsmith ingest ./jane-blog-posts/ --type blog
+```
+
+### Transcripts (Coaching Calls, Meetings, Podcasts)
+
+If the client has call transcripts in the same merged-markdown format that ContentSifter uses:
+
+```bash
+contentsifter -C jsmith ingest ./jane-transcripts/ --type transcript
+```
+
+This delegates to the full transcript parser (the same one used for coaching calls), which extracts speaker turns, metadata, and timestamps.
+
+### Checking What's Been Ingested
+
+```bash
+contentsifter -C jsmith ingest --status-only
+```
+
+This shows a table of how many items of each type have been imported and their total character count.
+
+### Auto-Detection
+
+If your files are named with prefixes like `linkedin-posts.md`, `email-outreach.md`, `newsletter-jan.md`, or `blog-leadership.md`, ContentSifter will auto-detect the type:
+
+```bash
+# No --type needed if the filename starts with the content type
+contentsifter -C jsmith ingest ./linkedin-posts.md
+```
 
 ---
 
-## Generate Reference
+## Voice Capture Interviews
 
-Generate content drafts from your extracted content bank.
+The biggest challenge with new clients is getting enough source material. Voice capture interviews solve this: you generate a questionnaire, the client talks through it using any voice transcription tool, and you ingest the transcript. In 60-90 minutes, you have a goldmine of stories, expertise, and opinions in their natural voice.
+
+### Step 1: Generate the Questionnaire
 
 ```bash
-contentsifter generate -q "QUERY" -f FORMAT [OPTIONS]
+contentsifter -C jsmith interview generate
 ```
 
-| Option | Required | Description |
-|--------|----------|-------------|
-| `-q, --query TEXT` | Yes | Search query to find source material |
-| `-f, --format FORMAT` | Yes | Output format (see below) |
-| `--topic TEXT` | No | Topic/title for the generated content |
-| `-c, --category CAT` | No | Filter source material by category |
-| `--min-quality INT` | No | Minimum quality score (default: 3) |
-| `--limit INT` | No | Max source items to use (default: 10) |
+This creates `content/clients/jsmith/interview-guide.md` — a markdown file with 85+ questions across 9 categories:
 
-### Available formats
+| Category | Questions | What It Captures |
+|----------|-----------|-----------------|
+| Warmup & Identity | 5 | Who they are, their elevator pitch |
+| Origin Story | 10 | Career journey, pivotal moments, failures |
+| Expertise & Method | 12 | Frameworks, processes, what makes them unique |
+| Client Stories & Wins | 10 | Transformations, before/after, results |
+| Problems & Pain Points | 10 | What their audience struggles with |
+| Contrarian Views & Hot Takes | 8 | Unpopular opinions, industry critiques |
+| Teaching Moments | 12 | Lessons learned, mistakes, tips |
+| Vision & Values | 8 | Why they do this work, where they're headed |
+| Quick-Fire Round | 10 | Short punchy answers, favorites, superlatives |
 
-| Format | Description |
-|--------|-------------|
+The questions draw from proven content frameworks: Dickie Bush's 4A Framework, Nicolas Cole's Endless Idea Generator, PipDecks Storyteller Tactics, StoryBrand (Donald Miller), Matthew Dicks' Storyworthy, Justin Welsh's Content Matrix, and SME interview techniques.
+
+### Adding Niche-Specific Questions
+
+If the client works in a specific industry, you can generate additional targeted questions:
+
+```bash
+contentsifter -C jsmith interview generate --niche "financial planning"
+```
+
+This adds 10-15 industry-specific questions to the end of the guide (requires API key).
+
+### Step 2: Client Records Their Answers
+
+Send the interview guide to the client. They should:
+
+1. Open any voice transcription tool (phone dictation, Otter.ai, Whisper, etc.)
+2. Start recording
+3. Read each question out loud, then answer it naturally
+4. Save the transcript as a `.txt` or `.md` file when done
+
+The guide includes detailed instructions and tips at the top.
+
+### Step 3: Ingest the Transcript
+
+```bash
+contentsifter -C jsmith interview ingest ./jane-transcript.txt
+```
+
+This parses the transcript by fuzzy-matching each question from the questionnaire, then stores each answer as a content item in the database. Answers shorter than 30 characters (like "skip") are automatically filtered out.
+
+You can point to a different questionnaire if needed:
+
+```bash
+contentsifter -C jsmith interview ingest ./transcript.txt --questionnaire ./custom-guide.md
+```
+
+### Step 4: Check What Was Captured
+
+```bash
+contentsifter -C jsmith interview status
+```
+
+This shows how many answers were captured, broken down by category, with average answer length.
+
+### What Comes Next
+
+After ingesting the interview, the standard pipeline takes over:
+
+```bash
+# Build voice print from interview answers
+contentsifter -C jsmith voice-print
+
+# Generate content in their voice
+contentsifter -C jsmith generate -q "career change" -f linkedin
+contentsifter -C jsmith plan-week
+```
+
+---
+
+## Building a Voice Print
+
+The voice print is what makes ContentSifter's output sound like your client instead of like generic AI. It's a detailed analysis of how they write and speak.
+
+### How It Works
+
+ContentSifter runs a 3-pass analysis using Claude:
+
+1. **Pass 1 (Vocabulary):** Identifies signature phrases, word choice patterns, register (casual vs. formal), metaphors, and tone
+2. **Pass 2 (Structure):** Analyzes how they open and close content, their teaching methodology, question patterns, and paragraph structure
+3. **Pass 3 (Synthesis):** Combines both passes into a single actionable voice profile document
+
+The analysis uses stratified sampling. It doesn't just grab random text. It specifically samples:
+- How they open content
+- How they close content
+- Their longest, most in-depth writing (monologues)
+- Their short, punchy writing
+- Their medium-length explanations
+- Their questions
+
+### Generating a Voice Print
+
+Make sure you've ingested enough content first. More content = better voice print. Aim for at least 20-30 pieces of content.
+
+```bash
+contentsifter -C jsmith voice-print
+```
+
+This takes a few minutes. The output is saved to `content/clients/jsmith/voice-print.md`.
+
+If you want to regenerate the voice print after adding more content:
+
+```bash
+contentsifter -C jsmith voice-print --force
+```
+
+You can control how many samples go into each bucket:
+
+```bash
+contentsifter -C jsmith voice-print --sample-size 150
+```
+
+The default is 100 samples per bucket. More samples = more accurate voice print, but uses more API tokens.
+
+### What the Voice Print Contains
+
+The voice print is a markdown file that describes:
+
+- Quick reference (tone, register, energy, sentence length)
+- Signature phrases and when to use them
+- Vocabulary profile (words to use, words to avoid)
+- Metaphors they use and what they mean
+- Formatting preferences (emoji, bold, caps, lists)
+- Sentence patterns (short punchy vs. medium vs. long narrative)
+- How they open and close different types of content
+- Emotional tone guide (encouraging, challenging, celebrating, addressing struggles)
+
+Every generated draft uses this voice print to match the client's natural writing style.
+
+---
+
+## Generating Content
+
+Once you have content ingested and a voice print built, you can generate drafts.
+
+### Basic Generation
+
+```bash
+contentsifter -C jsmith generate -q "networking tips" -f linkedin
+```
+
+This does three things:
+1. **Searches** the client's content bank for items matching "networking tips"
+2. **Generates** a LinkedIn post draft using the matched source material
+3. **Runs content gates** to remove AI-sounding patterns and match the client's voice
+
+The `-q` flag is the search query for finding relevant source material.
+The `-f` flag is the output format.
+
+### Available Formats
+
+| Format | What It Produces |
+|--------|-----------------|
 | `linkedin` | LinkedIn post (~200 words, hook + insight + CTA) |
 | `newsletter` | Email newsletter section (longer, more detailed) |
-| `thread` | Multi-part thread format (numbered posts) |
+| `thread` | Multi-part thread (numbered posts) |
 | `playbook` | Step-by-step guide with structured sections |
+| `video-script` | Short-form video script (30-60 seconds) |
+| `carousel` | LinkedIn carousel slide deck (slide-by-slide) |
+| `email-welcome` | Welcome email for new subscribers |
+| `email-weekly` | Weekly digest email |
+| `email-sales` | Sales or follow-up email |
 
-### Generate examples
+### Saving Drafts to Disk
+
+Add `--save` to write the draft to a timestamped file:
 
 ```bash
-# LinkedIn post about networking
-contentsifter generate -q "networking" -f linkedin
+contentsifter -C jsmith generate -q "leadership" -f linkedin --save
+```
 
-# Newsletter section about interview prep using only playbook extractions
-contentsifter generate -q "interview preparation" -f newsletter -c playbook
+The file is saved to `content/clients/jsmith/drafts/linkedin-20260222-143052.md`.
 
-# Thread from high-quality testimonials
-contentsifter generate -q "success story" -f thread -c testimonial --min-quality 4
+### Filtering Source Material
 
-# Playbook guide about LinkedIn optimization
-contentsifter generate -q "linkedin profile" -f playbook --topic "LinkedIn Profile Optimization"
+You can narrow which content items are used as source material:
+
+```bash
+# Only use playbook-type extractions as source
+contentsifter -C jsmith generate -q "interview prep" -f video-script -c playbook
+
+# Only use high-quality (4-5) extractions
+contentsifter -C jsmith generate -q "resume" -f carousel --min-quality 4
+
+# Use more source items for richer context
+contentsifter -C jsmith generate -q "salary" -f newsletter --limit 20
+```
+
+### Controlling Voice Matching
+
+```bash
+# Generate without voice matching (faster, no gates)
+contentsifter -C jsmith generate -q "networking" -f linkedin --no-voice-print
+
+# Keep voice context but skip the rewrite gates (faster)
+contentsifter -C jsmith generate -q "networking" -f linkedin --skip-gates
+```
+
+### Content Gates
+
+Every generated draft passes through two validation gates (in this order):
+
+1. **AI Gate** -- Catches and rewrites AI-sounding patterns. Checks for: em dashes (zero tolerance), hedging language ("It's important to note that..."), five-dollar words ("utilize" instead of "use"), formulaic openings/closings, passive voice, and 50+ other patterns. The reference document is `content/ai-gate.md`.
+
+2. **Voice Gate** -- Rewrites the draft to match the client's voice print. Matches: tone, vocabulary, sentence patterns, energy level, formatting style, signature phrases, and teaching structure.
+
+Gates run automatically when a voice print exists. Use `--skip-gates` to bypass them for faster generation, or `--no-voice-print` to disable both voice matching and gates entirely.
+
+---
+
+## Searching Content
+
+### Keyword Search
+
+```bash
+contentsifter -C jsmith search "leadership"
+```
+
+This uses SQLite FTS5 (full-text search with Porter stemming). It matches against extraction titles, content, raw quotes, and context notes.
+
+### Semantic Search (AI)
+
+```bash
+contentsifter -C jsmith search "how do I deal with imposter syndrome" --semantic
+```
+
+Semantic search is a 3-stage pipeline:
+1. Claude expands your query into related terms
+2. FTS5 retrieves candidate matches (3x your limit)
+3. Claude re-ranks the candidates by actual relevance
+
+This is much better for natural language questions, but uses API tokens.
+
+### Filtering Results
+
+```bash
+# By category
+contentsifter -C jsmith search "networking" -c playbook
+contentsifter -C jsmith search "success" -c testimonial -c story
+
+# By tag
+contentsifter -C jsmith search "resume" -t linkedin -t personal_branding
+
+# By date range
+contentsifter -C jsmith search "interview" --date-from 2024-01-01 --date-to 2024-12-31
+
+# By quality score
+contentsifter -C jsmith search "salary" --min-quality 4
+
+# Combine filters
+contentsifter -C jsmith search "networking" -c playbook -t linkedin --min-quality 3
+```
+
+### Output Formats
+
+```bash
+# Table view (default) -- shows title, category, quality, date
+contentsifter -C jsmith search "resume"
+
+# Full view -- shows complete content, raw quotes, and tags
+contentsifter -C jsmith search "resume" --output-format full --limit 5
+
+# JSON -- pipe to a file or another tool
+contentsifter -C jsmith search "salary" --output-format json > salary_results.json
 ```
 
 ---
 
-## Direct Database Access
+## Planning a Week of Content
 
-The database is a standard SQLite file at `data/contentsifter.db`. You can query it directly for advanced use cases.
+ContentSifter can generate a full week of content following a fixed schedule:
 
-### Open the database
+| Day | Content Pillar | Format | Source Category |
+|-----|---------------|--------|-----------------|
+| Monday | Story | LinkedIn text post | `story` |
+| Tuesday | Playbook | LinkedIn carousel | `playbook` |
+| Wednesday | Video | Short-form script | Any high-quality |
+| Thursday | Q&A | LinkedIn text post | `qa` |
+| Friday | Testimonial | LinkedIn text post | `testimonial` |
+| Saturday | Newsletter | Weekly email | Mix of all |
+| Sunday | Rest | -- | -- |
+
+### Generate a Full Calendar
 
 ```bash
-sqlite3 data/contentsifter.db
+contentsifter -C jsmith plan-week
 ```
 
-Enable useful settings:
+This selects high-quality unused extractions for each day, generates a draft for each one using the voice print, and saves the full calendar to `content/clients/jsmith/calendar/week-2026-02-23.md`.
+
+ContentSifter tracks which content items have been used, so running `plan-week` again will pull different source material. No repeats.
+
+### Calendar Without AI Drafts
+
+If you just want the source material selected for each day (no API calls):
+
+```bash
+contentsifter -C jsmith plan-week --no-llm
+```
+
+### Focus on a Topic
+
+```bash
+contentsifter -C jsmith plan-week --topic-focus networking
+```
+
+This biases the content selection toward items tagged with "networking".
+
+### Generate for a Specific Week
+
+```bash
+contentsifter -C jsmith plan-week --week-of 2026-03-10
+```
+
+### Skip Gates for Speed
+
+```bash
+contentsifter -C jsmith plan-week --skip-gates
+```
+
+---
+
+## The Transcript Pipeline (Advanced)
+
+If your client has coaching calls, meetings, or podcast transcripts, you can run the full extraction pipeline. This is what was originally built for the ClearCareer coaching program.
+
+### Step 1: Parse Transcripts
+
+```bash
+contentsifter -C jsmith parse --input ./jane-transcripts/
+```
+
+This reads markdown files, splits them into individual calls (using `<!-- SOURCE FILE: ... -->` markers), parses metadata (date, title, participants, call type) and speaker turns, and stores everything in SQLite.
+
+It's idempotent: re-running skips already-parsed calls.
+
+### Step 2: Topic Chunking (AI)
+
+```bash
+contentsifter -C jsmith chunk
+```
+
+This sends each call's transcript to Claude, which identifies distinct topical segments. For example, in a group Q&A call, each participant's question-and-answer session becomes a separate chunk.
+
+### Step 3: Content Extraction (AI)
+
+```bash
+contentsifter -C jsmith extract
+```
+
+This processes each topic chunk and extracts categorized content items:
+- **Q&A** (`qa`): Questions asked and answers given
+- **Testimonial** (`testimonial`): Success stories, wins, positive feedback
+- **Playbook** (`playbook`): Step-by-step advice, frameworks, methodologies
+- **Story** (`story`): Personal stories, anecdotes, illustrative examples
+
+Each extraction gets a quality score (1-5) and topic tags.
+
+### Run All Three Steps at Once
+
+```bash
+contentsifter -C jsmith sift --input ./jane-transcripts/
+```
+
+### Check Progress
+
+```bash
+contentsifter -C jsmith status
+```
+
+---
+
+## Content Templates
+
+ContentSifter includes curated content planning templates (not AI-generated). These are reference frameworks you can use alongside the generated drafts.
+
+```bash
+contentsifter init-templates
+```
+
+This writes templates to `content/templates/`:
+- **LinkedIn frameworks:** PAS (Problem-Agitate-Solve), Story-Lesson, tips lists, case studies, carousels
+- **Newsletter frameworks:** Weekly structure, subject line patterns
+- **Video frameworks:** Short-form hooks, CTAs, visual cues
+- **Hooks library:** Opening patterns organized by type
+- **Email templates:** Welcome sequence, weekly digest, sales/launch emails
+
+Use `--force` to overwrite existing template files.
+
+---
+
+## Data Commands
+
+### Check Processing Status
+
+```bash
+contentsifter -C jsmith status
+```
+
+Shows:
+- Pipeline progress (how many calls are parsed/chunked/extracted)
+- Ingested content item counts by type
+- Extraction breakdown by category
+
+### Detailed Statistics
+
+```bash
+contentsifter -C jsmith stats
+```
+
+Shows:
+- Calls broken down by type
+- Date range of all calls
+- Total speaker turns
+- Top 20 most-used tags
+
+### Export to JSON
+
+```bash
+contentsifter -C jsmith export
+contentsifter -C jsmith export --output ./my-exports/
+```
+
+Creates three outputs:
+- `full_export.json` -- every extraction in one file
+- `by_category/` -- one JSON file per category (qa.json, playbook.json, etc.)
+- `by_call/` -- one JSON file per call with its extractions
+
+---
+
+## Global Options
+
+These options go between `contentsifter` and the command name:
+
+| Option | Default | What It Does |
+|--------|---------|-------------|
+| `-C, --client SLUG` | from `clients.json` | Which client to work with |
+| `--db PATH` | from client config | Override the database path |
+| `--llm-mode MODE` | `auto` | How to access Claude: `auto`, `api`, or `claude-code` |
+| `--model MODEL` | `claude-sonnet-4-20250514` | Which Claude model to use |
+| `-v, --verbose` | off | Show debug logging |
+
+Example:
+
+```bash
+contentsifter -C jsmith --verbose generate -q "networking" -f linkedin
+```
+
+---
+
+## How the Database Works
+
+Each client gets their own SQLite database. You never need to touch it directly, but it's a standard SQLite file if you want to query it.
+
+### Where Databases Live
+
+```
+data/contentsifter.db                          # Default client (Izzy)
+data/clients/jsmith/contentsifter.db           # Jane Smith
+data/clients/acme/contentsifter.db             # Acme Corp
+```
+
+### Database Tables
+
+| Table | What It Stores |
+|-------|---------------|
+| `calls` | Individual coaching calls (title, date, type, turn count) |
+| `participants` | Per-call participants (name, email, coach flag) |
+| `speaker_turns` | Every speaker turn with text and timestamps |
+| `topic_chunks` | AI-identified topic segments per call |
+| `content_items` | Ingested written content (LinkedIn posts, emails, etc.) |
+| `extractions` | Extracted content items (the core output for generation) |
+| `tags` | Topic tag definitions |
+| `extraction_tags` | Links between extractions and tags |
+| `processing_log` | Pipeline stage tracking |
+| `extractions_fts` | Full-text search index for extractions |
+| `speaker_turns_fts` | Full-text search index for raw transcripts |
+| `content_items_fts` | Full-text search index for ingested content |
+
+### Querying Directly
+
+```bash
+sqlite3 data/clients/jsmith/contentsifter.db
+```
 
 ```sql
 .mode column
 .headers on
-```
 
-### Useful queries
+-- See all ingested content
+SELECT id, content_type, title, char_count, date FROM content_items;
 
-**List all calls:**
-```sql
-SELECT id, call_date, call_type, title, turn_count
-FROM calls
-ORDER BY call_date;
-```
+-- See all extractions ranked by quality
+SELECT id, category, quality_score, title FROM extractions ORDER BY quality_score DESC;
 
-**View all extractions:**
-```sql
-SELECT e.id, e.category, e.quality_score, e.title, c.call_date
-FROM extractions e
-JOIN calls c ON e.call_id = c.id
-ORDER BY e.quality_score DESC;
-```
+-- Count extractions by category
+SELECT category, COUNT(*) as count FROM extractions GROUP BY category ORDER BY count DESC;
 
-**Extractions by category:**
-```sql
-SELECT category, COUNT(*) as count
-FROM extractions
-GROUP BY category
-ORDER BY count DESC;
-```
-
-**Top-quality extractions (score 5):**
-```sql
-SELECT e.category, e.title, e.content, c.title as call_title, c.call_date
-FROM extractions e
-JOIN calls c ON e.call_id = c.id
-WHERE e.quality_score = 5
-ORDER BY c.call_date DESC;
-```
-
-**Full-text search on extractions:**
-```sql
-SELECT e.id, e.category, e.title, snippet(extractions_fts, 1, '>>>', '<<<', '...', 30) as match
+-- Full-text search
+SELECT id, title, snippet(extractions_fts, 1, '>>>', '<<<', '...', 30) as match
 FROM extractions_fts
-JOIN extractions e ON extractions_fts.rowid = e.id
-WHERE extractions_fts MATCH 'linkedin networking'
+JOIN extractions ON extractions_fts.rowid = extractions.id
+WHERE extractions_fts MATCH 'networking'
 ORDER BY rank;
-```
 
-**Full-text search on raw transcript text:**
-```sql
-SELECT st.speaker_name, st.timestamp, snippet(speaker_turns_fts, 0, '>>>', '<<<', '...', 30) as match
-FROM speaker_turns_fts
-JOIN speaker_turns st ON speaker_turns_fts.rowid = st.id
-WHERE speaker_turns_fts MATCH 'salary negotiation'
-ORDER BY rank
-LIMIT 20;
-```
-
-**Extractions with their tags:**
-```sql
-SELECT e.id, e.category, e.title, GROUP_CONCAT(t.name, ', ') as tags
-FROM extractions e
-LEFT JOIN extraction_tags et ON e.id = et.extraction_id
-LEFT JOIN tags t ON et.tag_id = t.id
-GROUP BY e.id
-ORDER BY e.quality_score DESC;
-```
-
-**Find extractions by tag:**
-```sql
-SELECT e.category, e.title, e.quality_score, c.call_date
-FROM extractions e
-JOIN extraction_tags et ON e.id = et.extraction_id
-JOIN tags t ON et.tag_id = t.id
-JOIN calls c ON e.call_id = c.id
-WHERE t.name = 'linkedin'
-ORDER BY e.quality_score DESC;
-```
-
-**Tag frequency:**
-```sql
+-- See which tags are most used
 SELECT t.name, COUNT(*) as usage_count
 FROM tags t
 JOIN extraction_tags et ON t.id = et.tag_id
@@ -460,165 +797,245 @@ GROUP BY t.name
 ORDER BY usage_count DESC;
 ```
 
-**Calls by type with extraction counts:**
-```sql
-SELECT c.call_type, COUNT(DISTINCT c.id) as calls, COUNT(e.id) as extractions
-FROM calls c
-LEFT JOIN extractions e ON c.id = e.call_id
-GROUP BY c.call_type
-ORDER BY calls DESC;
-```
+---
 
-**Processing pipeline status:**
-```sql
-SELECT stage, status, COUNT(*) as count
-FROM processing_log
-GROUP BY stage, status
-ORDER BY stage;
-```
+## Content Categories
 
-**Find a specific speaker's contributions:**
-```sql
-SELECT c.title, c.call_date, st.timestamp, st.text
-FROM speaker_turns st
-JOIN calls c ON st.call_id = c.id
-WHERE st.speaker_name LIKE '%Izzy%'
-ORDER BY c.call_date, st.turn_index
-LIMIT 50;
-```
+Every extraction is classified into one of four categories:
 
-**Extractions with full context (call + chunk + tags):**
-```sql
-SELECT
-    e.id,
-    e.category,
-    e.title,
-    e.content,
-    e.raw_quote,
-    e.quality_score,
-    e.speaker,
-    tc.topic_title as chunk_topic,
-    c.title as call_title,
-    c.call_date,
-    c.call_type,
-    GROUP_CONCAT(t.name, ', ') as tags
-FROM extractions e
-JOIN calls c ON e.call_id = c.id
-LEFT JOIN topic_chunks tc ON e.chunk_id = tc.id
-LEFT JOIN extraction_tags et ON e.id = et.extraction_id
-LEFT JOIN tags t ON et.tag_id = t.id
-GROUP BY e.id
-ORDER BY e.quality_score DESC, c.call_date DESC;
-```
+| Category | Key | What It Is | Example |
+|----------|-----|-----------|---------|
+| Q&A | `qa` | A question someone asked and the answer given | "How do I follow up after a recruiter ghosts me?" |
+| Testimonial | `testimonial` | Success stories, wins, positive feedback | "Client landed a Director role with a $30K raise" |
+| Playbook | `playbook` | Step-by-step advice, frameworks, how-tos | "5-step post-interview follow-up email template" |
+| Story | `story` | Personal stories, anecdotes, examples | "The time I showed up to a job in a Pikachu costume" |
 
-**Date range statistics:**
-```sql
-SELECT
-    strftime('%Y-%m', call_date) as month,
-    COUNT(*) as calls,
-    SUM(turn_count) as total_turns
-FROM calls
-GROUP BY month
-ORDER BY month;
-```
+## Topic Tags
+
+Extractions are tagged with relevant topics for filtering:
+
+`linkedin` `networking` `resume` `interviews` `cover_letter` `salary_negotiation` `mindset` `confidence` `personal_branding` `career_transition` `job_search_strategy` `follow_up` `company_research` `recruiter` `informational_interview` `remote_work` `portfolio` `references` `onboarding` `rejection_handling` `time_management` `ai_tools` `volunteer` `entrepreneurship` `freelancing`
 
 ---
 
-## Database Schema
-
-The SQLite database contains these tables:
-
-| Table | Description |
-|-------|-------------|
-| `calls` | Individual coaching calls (title, date, type, turn count) |
-| `participants` | Per-call participant list (name, email, is_coach flag) |
-| `speaker_turns` | Every speaker turn with text and timestamps |
-| `topic_chunks` | AI-identified topic segments per call |
-| `extractions` | Extracted content items (the core output) |
-| `tags` | Topic tag definitions |
-| `extraction_tags` | Many-to-many link between extractions and tags |
-| `processing_log` | Pipeline stage tracking (parsed/chunked/extracted) |
-| `extractions_fts` | FTS5 virtual table for extraction full-text search |
-| `speaker_turns_fts` | FTS5 virtual table for raw transcript search |
-
----
-
-## Architecture
-
-```
-transcripts/*.md
-       │
-       ▼
-   ┌────────┐     Split on <!-- SOURCE FILE --> markers,
-   │ Parser │     parse metadata + speaker turns
-   └────┬───┘
-        │
-        ▼
-   ┌────────┐     Claude identifies topic boundaries
-   │Chunker │     in each transcript
-   └────┬───┘
-        │
-        ▼
-  ┌──────────┐    Claude extracts Q&As, playbooks,
-  │Extractor │    testimonials, stories per chunk
-  └─────┬────┘
-        │
-        ▼
-  ┌──────────┐    SQLite + FTS5, searchable
-  │ Database │    via CLI or direct SQL
-  └─────┬────┘
-        │
-        ▼
-  ┌──────────┐    LinkedIn, newsletter, thread,
-  │Generator │    playbook format drafts
-  └──────────┘
-```
-
-### Project structure
+## File Structure
 
 ```
 contentsifter/
-├── pyproject.toml                    # Build config & dependencies
-├── CLAUDE.md                         # AI assistant context
-├── src/contentsifter/
-│   ├── cli.py                        # Click CLI commands
-│   ├── config.py                     # Paths, constants, call type mapping
-│   ├── process.py                    # Batch processing helper
-│   ├── parser/
-│   │   ├── splitter.py               # Split merged markdown files
-│   │   ├── metadata.py               # Parse date, title, participants
-│   │   └── turns.py                  # Parse speaker turn dicts
-│   ├── extraction/
-│   │   ├── chunker.py                # Topic segmentation via Claude
-│   │   ├── extractor.py              # Content extraction per chunk
-│   │   ├── prompts.py                # Prompt templates
-│   │   └── categories.py             # Category & tag definitions
-│   ├── llm/
-│   │   └── client.py                 # Claude API client
-│   ├── storage/
-│   │   ├── database.py               # SQLite schema, FTS5
-│   │   ├── models.py                 # Dataclasses
-│   │   ├── repository.py             # CRUD operations
-│   │   └── export.py                 # JSON export
-│   ├── search/
-│   │   ├── keyword.py                # FTS5 keyword search
-│   │   ├── semantic.py               # Claude-powered semantic search
-│   │   └── filters.py                # Filter builder
-│   └── generate/
-│       ├── drafts.py                 # Content generation
-│       └── templates.py              # Format templates
-└── data/                             # Generated (gitignored)
-    ├── contentsifter.db
-    └── exports/
+  clients.json                      # Client registry (who your clients are)
+  pyproject.toml                    # Python package config
+  CLAUDE.md                        # Instructions for Claude Code
+  README.md                        # This file
+  transcripts/                     # Source transcript files (gitignored)
+  data/                            # Databases and exports (gitignored)
+    contentsifter.db               #   Default client database
+    clients/                       #   Per-client databases
+      jsmith/
+        contentsifter.db
+  content/                         # Generated content
+    voice-print.md                 #   Default client voice profile
+    ai-gate.md                     #   AI detection patterns (shared)
+    templates/                     #   Content planning frameworks
+    calendar/                      #   Weekly content calendars
+    drafts/                        #   Saved generated drafts
+    clients/                       #   Per-client content
+      jsmith/
+        voice-print.md
+        drafts/
+        calendar/
+  src/contentsifter/               # Source code
+    cli.py                         #   Click CLI commands
+    config.py                      #   Paths, client config, constants
+    process.py                     #   Batch processing for Claude Code
+    ingest/                        #   Content ingestion module
+      reader.py                    #     File reading + DB insertion
+      formats.py                   #     Format-specific parsers
+    parser/                        #   Transcript parsing
+      splitter.py                  #     Split merged markdown files
+      metadata.py                  #     Parse date, title, participants
+      turns.py                     #     Parse speaker turns
+    extraction/                    #   AI-powered content extraction
+      chunker.py                   #     Topic segmentation via Claude
+      extractor.py                 #     Content extraction per chunk
+      prompts.py                   #     Prompt templates
+      categories.py                #     Category + tag definitions
+    llm/                           #   LLM client abstraction
+      client.py                    #     API, Claude Code, callback modes
+    storage/                       #   Database layer
+      database.py                  #     SQLite schema, FTS5, triggers
+      models.py                    #     Dataclasses
+      repository.py                #     CRUD operations
+      export.py                    #     JSON export
+    search/                        #   Search functionality
+      keyword.py                   #     FTS5 keyword search
+      semantic.py                  #     Claude-powered re-ranking
+      filters.py                   #     SearchFilters dataclass
+    generate/                      #   Content generation
+      drafts.py                    #     Draft generation + gate integration
+      templates.py                 #     9 format templates
+      gates.py                     #     AI detection + voice matching gates
+    interview/                     #   Voice capture interview system
+      prompts.py                   #     85-question prompt library (9 categories)
+      generator.py                 #     Questionnaire markdown generator
+      parser.py                    #     Fuzzy-match transcript parser
+    planning/                      #   Content planning
+      calendar.py                  #     Weekly calendar generator
+      voiceprint.py                #     3-pass voice analysis
+      templates_static.py          #     Curated content frameworks
+      prompts.py                   #     Voice analysis prompts
+      writer.py                    #     File I/O helpers
 ```
+
+---
+
+## End-to-End Walkthrough: New Client from Scratch
+
+Here's the complete process for taking a new client from zero to generated content:
+
+### 1. Create the Client
+
+```bash
+contentsifter client create jsmith --name "Jane Smith" --email jane@example.com
+```
+
+### 2. Prepare Their Content
+
+Gather the client's existing content. The more you have, the better the voice print and the richer the content bank.
+
+Create a markdown file with their LinkedIn posts:
+
+```markdown
+date: 2026-01-15
+title: Why I Stopped Chasing Promotions
+
+I spent 8 years climbing a ladder that was leaning against the wrong wall.
+
+Every promotion felt hollow. More money, more stress, less purpose.
+
+Then I asked myself one question: "If I had to do this for 20 more years, would I?"
+
+The answer changed everything.
+
+---
+
+date: 2026-01-22
+title: The Meeting That Changed My Career
+
+Three years ago I walked into a coffee shop to meet someone I'd cold-emailed on LinkedIn.
+
+I was terrified. My hands were shaking.
+
+That person became my mentor, then my business partner, then my closest friend.
+
+All because I sent one awkward message.
+
+Just send the message.
+```
+
+### 3. Ingest the Content
+
+```bash
+contentsifter -C jsmith ingest ./jane-posts.md --type linkedin
+```
+
+### 4. Check What Got Imported
+
+```bash
+contentsifter -C jsmith ingest --status-only
+```
+
+### 5. Build the Voice Print
+
+```bash
+contentsifter -C jsmith voice-print
+```
+
+Wait a few minutes. When it's done, open `content/clients/jsmith/voice-print.md` to review the analysis.
+
+### 6. Generate a Draft
+
+```bash
+contentsifter -C jsmith generate -q "career change" -f linkedin
+```
+
+The output should sound like Jane, not like AI.
+
+### 7. Save Drafts You Like
+
+```bash
+contentsifter -C jsmith generate -q "mentorship" -f linkedin --save
+contentsifter -C jsmith generate -q "leadership" -f newsletter --save
+```
+
+Saved drafts go to `content/clients/jsmith/drafts/`.
+
+### 8. Plan a Full Week
+
+```bash
+contentsifter -C jsmith plan-week
+```
+
+The calendar is saved to `content/clients/jsmith/calendar/`.
+
+---
 
 ## Dependencies
 
-| Package | Purpose |
-|---------|---------|
-| [Click](https://click.palletsprojects.com/) | CLI framework |
-| [Anthropic](https://docs.anthropic.com/en/docs/client-sdks/python) | Claude API client |
-| [Rich](https://rich.readthedocs.io/) | Terminal formatting (tables, progress bars, colors) |
+| Package | What It Does |
+|---------|-------------|
+| [Click](https://click.palletsprojects.com/) | Powers the CLI (command parsing, options, help text) |
+| [Anthropic](https://docs.anthropic.com/en/docs/client-sdks/python) | Talks to Claude for AI-powered features |
+| [Rich](https://rich.readthedocs.io/) | Makes terminal output look good (tables, colors, progress bars) |
+
+## LLM Access Modes
+
+ContentSifter supports three ways to access Claude:
+
+| Mode | How It Works | When to Use |
+|------|-------------|-------------|
+| **API** | Uses `ANTHROPIC_API_KEY` env var | Default. Set the key and go. |
+| **Claude Code** | Calls `claude --print` as a subprocess | When you don't have an API key but have Claude Code installed |
+| **Callback** | Python function injection | For programmatic use via `process.py` |
+
+`--llm-mode auto` (the default) tries the API key first. If it's not set, it falls back to Claude Code.
+
+---
+
+## Troubleshooting
+
+### "command not found: contentsifter"
+
+Your virtual environment isn't activated. Run:
+
+```bash
+source venv/bin/activate
+```
+
+### "No database found. Run 'parse' or 'ingest' first."
+
+You haven't imported any content yet. See the [Ingesting Content](#ingesting-content) section.
+
+### "Unknown client: xyz"
+
+The client doesn't exist in `clients.json`. Create it first:
+
+```bash
+contentsifter client create xyz --name "Name Here"
+```
+
+### "No content found. Ingest some content or parse transcripts first."
+
+The voice-print command needs content to analyze. Make sure you've ingested at least some content items or parsed some transcripts first.
+
+### AI commands hang or timeout
+
+If you're running inside Claude Code, the `claude --print` subprocess approach doesn't work. Set `ANTHROPIC_API_KEY` directly instead:
+
+```bash
+export ANTHROPIC_API_KEY="your-key"
+```
+
+---
 
 ## Development
 
@@ -628,11 +1045,8 @@ pip install -e ".[dev]"
 
 # Run tests
 pytest
-
-# Run a specific test
-pytest tests/test_parser.py -v
 ```
 
 ## License
 
-Private project — not for redistribution.
+Private project -- not for redistribution.

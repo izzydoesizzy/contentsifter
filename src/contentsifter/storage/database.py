@@ -150,12 +150,54 @@ CREATE TABLE IF NOT EXISTS processing_log (
     UNIQUE(call_id, stage)
 );
 
+-- Ingested content items (LinkedIn posts, emails, newsletters, blog posts, etc.)
+CREATE TABLE IF NOT EXISTS content_items (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    source_file    TEXT,
+    content_type   TEXT NOT NULL,
+    title          TEXT,
+    text           TEXT NOT NULL,
+    author         TEXT,
+    date           TEXT,
+    metadata_json  TEXT,
+    char_count     INTEGER,
+    is_extracted   INTEGER DEFAULT 0,
+    created_at     TEXT DEFAULT (datetime('now'))
+);
+
+CREATE VIRTUAL TABLE IF NOT EXISTS content_items_fts USING fts5(
+    title,
+    text,
+    content=content_items,
+    content_rowid=id,
+    tokenize='porter unicode61'
+);
+
+CREATE TRIGGER IF NOT EXISTS content_items_ai AFTER INSERT ON content_items BEGIN
+    INSERT INTO content_items_fts(rowid, title, text)
+    VALUES (new.id, new.title, new.text);
+END;
+
+CREATE TRIGGER IF NOT EXISTS content_items_ad AFTER DELETE ON content_items BEGIN
+    INSERT INTO content_items_fts(content_items_fts, rowid, title, text)
+    VALUES ('delete', old.id, old.title, old.text);
+END;
+
+CREATE TRIGGER IF NOT EXISTS content_items_au AFTER UPDATE ON content_items BEGIN
+    INSERT INTO content_items_fts(content_items_fts, rowid, title, text)
+    VALUES ('delete', old.id, old.title, old.text);
+    INSERT INTO content_items_fts(rowid, title, text)
+    VALUES (new.id, new.title, new.text);
+END;
+
 -- Schema version tracking
 CREATE TABLE IF NOT EXISTS schema_version (
     version INTEGER NOT NULL
 );
 
 -- Indexes
+CREATE INDEX IF NOT EXISTS idx_content_items_type ON content_items(content_type);
+CREATE INDEX IF NOT EXISTS idx_content_items_extracted ON content_items(is_extracted);
 CREATE INDEX IF NOT EXISTS idx_calls_date ON calls(call_date);
 CREATE INDEX IF NOT EXISTS idx_calls_type ON calls(call_type);
 CREATE INDEX IF NOT EXISTS idx_speaker_turns_call ON speaker_turns(call_id);

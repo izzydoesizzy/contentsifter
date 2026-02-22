@@ -131,10 +131,11 @@ def select_content_for_week(
     db: Database,
     topic_focus: str | None = None,
     used_ids: list[int] | None = None,
+    cal_dir: Path = CALENDAR_DIR,
 ) -> dict[str, list[dict]]:
     """Select content for each day of the week."""
     if used_ids is None:
-        used_ids = _load_used_ids(CALENDAR_DIR)
+        used_ids = _load_used_ids(cal_dir)
 
     selections: dict[str, list[dict]] = {}
     newly_used: list[int] = []
@@ -230,20 +231,23 @@ def generate_calendar(
     llm_client=None,
     use_llm: bool = True,
     skip_gates: bool = False,
+    calendar_dir: Path = CALENDAR_DIR,
+    voice_print_path: Path | None = None,
 ) -> tuple[str, Path]:
     """Generate a weekly content calendar.
 
     Returns (markdown_content, output_path).
     """
     monday = _get_monday(week_of)
-    used_ids = _load_used_ids(CALENDAR_DIR)
+    used_ids = _load_used_ids(calendar_dir)
 
-    selections = select_content_for_week(db, topic_focus=topic_focus, used_ids=used_ids)
+    selections = select_content_for_week(db, topic_focus=topic_focus, used_ids=used_ids,
+                                          cal_dir=calendar_dir)
 
     # Generate drafts if LLM is available
     drafts: dict[str, str] = {}
     if use_llm and llm_client:
-        voice_print = load_voice_print()
+        voice_print = load_voice_print(path=voice_print_path)
 
         for day_name, (pillar, format_type, category, platform) in WEEKLY_SCHEDULE.items():
             if pillar is None or not selections.get(day_name):
@@ -270,8 +274,8 @@ def generate_calendar(
     markdown = format_calendar_markdown(monday, selections, drafts if drafts else None)
 
     # Save
-    CALENDAR_DIR.mkdir(parents=True, exist_ok=True)
-    output_path = CALENDAR_DIR / f"week-{monday.strftime('%Y-%m-%d')}.md"
+    calendar_dir.mkdir(parents=True, exist_ok=True)
+    output_path = calendar_dir / f"week-{monday.strftime('%Y-%m-%d')}.md"
     output_path.write_text(markdown)
 
     # Update used IDs
@@ -279,6 +283,6 @@ def generate_calendar(
     for items in selections.values():
         newly_used.extend(item["id"] for item in items)
     if newly_used:
-        _save_used_ids(CALENDAR_DIR, used_ids + newly_used)
+        _save_used_ids(calendar_dir, used_ids + newly_used)
 
     return markdown, output_path

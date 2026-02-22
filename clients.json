@@ -1,0 +1,12 @@
+{
+  "default": "izzy",
+  "clients": {
+    "izzy": {
+      "name": "Izzy Piyale-Sheard",
+      "email": "izzy@joinclearcareer.com",
+      "db_path": "data/contentsifter.db",
+      "content_dir": "content",
+      "description": "ClearCareer career coaching"
+    }
+  }
+}

@@ -1,5 +1,7 @@
 """Parse metadata headers from individual call records."""
 
+from __future__ import annotations
+
 import re
 from typing import Optional
 
@@ -21,7 +23,11 @@ def classify_call_type(filename: str) -> str:
     return "other"
 
 
-def parse_participants(raw: str) -> list[Participant]:
+def parse_participants(
+    raw: str,
+    coach_name: str = COACH_NAME,
+    coach_email: str = COACH_EMAIL,
+) -> list[Participant]:
     """Parse the participants string into Participant objects."""
     participants = []
     for part in raw.split(","):
@@ -30,7 +36,7 @@ def parse_participants(raw: str) -> list[Participant]:
             continue
 
         is_coach = (
-            COACH_NAME.lower() in part.lower() or COACH_EMAIL.lower() in part.lower()
+            coach_name.lower() in part.lower() or coach_email.lower() in part.lower()
         )
 
         # Check if it looks like an email
@@ -52,7 +58,13 @@ def extract_fathom_id(filename: str) -> Optional[str]:
     return match.group(1) if match else None
 
 
-def parse_metadata(raw_text: str, source_file: str, original_filename: str) -> CallMetadata:
+def parse_metadata(
+    raw_text: str,
+    source_file: str,
+    original_filename: str,
+    coach_name: str = COACH_NAME,
+    coach_email: str = COACH_EMAIL,
+) -> CallMetadata:
     """Extract structured metadata from a call record's header."""
     # Find all titles (first is filename, second is human-readable)
     titles = TITLE_PATTERN.findall(raw_text)
@@ -66,7 +78,7 @@ def parse_metadata(raw_text: str, source_file: str, original_filename: str) -> C
 
     participants_match = PARTICIPANTS_PATTERN.search(raw_text)
     participants = (
-        parse_participants(participants_match.group(1))
+        parse_participants(participants_match.group(1), coach_name, coach_email)
         if participants_match
         else []
     )

@@ -1,4 +1,4 @@
-"""Voice print analyzer — builds a voice profile from coach's speaker turns."""
+"""Voice print analyzer — builds a voice profile from speaker turns and/or content items."""
 
 from __future__ import annotations
 
@@ -24,25 +24,47 @@ MAX_CHARS_PER_BUCKET = 8000
 MAX_TOTAL_CHARS = 50000
 
 
-def get_coach_turn_stats(db: Database) -> dict:
+def get_coach_turn_stats(
+    db: Database,
+    coach_name: str = COACH_NAME,
+    coach_email: str = COACH_EMAIL,
+) -> dict:
     """Get basic stats about the coach's speaker turns."""
     row = db.conn.execute(
         """SELECT COUNT(*) as turn_count,
-                  SUM(LENGTH(text)) as total_chars,
+                  COALESCE(SUM(LENGTH(text)), 0) as total_chars,
                   COUNT(DISTINCT call_id) as call_count
            FROM speaker_turns
            WHERE speaker_name LIKE ? OR speaker_email = ?""",
-        (f"%{COACH_NAME}%", COACH_EMAIL),
+        (f"%{coach_name}%", coach_email),
     ).fetchone()
     return dict(row) if row else {"turn_count": 0, "total_chars": 0, "call_count": 0}
 
 
-def get_stratified_coach_sample(db: Database, per_bucket: int = 100) -> dict[str, list[dict]]:
+def get_content_item_stats(db: Database) -> dict:
+    """Get basic stats about ingested content items."""
+    try:
+        row = db.conn.execute(
+            """SELECT COUNT(*) as item_count,
+                      COALESCE(SUM(char_count), 0) as total_chars
+               FROM content_items"""
+        ).fetchone()
+        return dict(row) if row else {"item_count": 0, "total_chars": 0}
+    except Exception:
+        return {"item_count": 0, "total_chars": 0}
+
+
+def get_stratified_coach_sample(
+    db: Database,
+    per_bucket: int = 100,
+    coach_name: str = COACH_NAME,
+    coach_email: str = COACH_EMAIL,
+) -> dict[str, list[dict]]:
     """Get categorized samples of the coach's speech patterns.
 
     Returns dict with keys: openings, closings, monologues, short, medium, questions
     """
-    coach_filter = f"%{COACH_NAME}%"
+    coach_filter = f"%{coach_name}%"
     samples: dict[str, list[dict]] = {}
 
     # 1. Openings — first 3 coach turns per call
@@ -55,7 +77,7 @@ def get_stratified_coach_sample(db: Database, per_bucket: int = 100) -> dict[str
            )
            SELECT text FROM ranked WHERE rn <= 3
            ORDER BY RANDOM() LIMIT ?""",
-        (coach_filter, COACH_EMAIL, per_bucket),
+        (coach_filter, coach_email, per_bucket),
     ).fetchall()
     samples["openings"] = [dict(r) for r in rows]
 
@@ -69,7 +91,7 @@ def get_stratified_coach_sample(db: Database, per_bucket: int = 100) -> dict[str
            )
            SELECT text FROM ranked WHERE rn <= 3
            ORDER BY RANDOM() LIMIT ?""",
-        (coach_filter, COACH_EMAIL, per_bucket),
+        (coach_filter, coach_email, per_bucket),
     ).fetchall()
     samples["closings"] = [dict(r) for r in rows]
 
@@ -79,7 +101,7 @@ def get_stratified_coach_sample(db: Database, per_bucket: int = 100) -> dict[str
            WHERE (speaker_name LIKE ? OR speaker_email = ?)
              AND LENGTH(text) > 500
            ORDER BY RANDOM() LIMIT ?""",
-        (coach_filter, COACH_EMAIL, per_bucket),
+        (coach_filter, coach_email, per_bucket),
     ).fetchall()
     samples["monologues"] = [dict(r) for r in rows]
 
@@ -89,7 +111,7 @@ def get_stratified_coach_sample(db: Database, per_bucket: int = 100) -> dict[str
            WHERE (speaker_name LIKE ? OR speaker_email = ?)
              AND LENGTH(text) < 100
            ORDER BY RANDOM() LIMIT ?""",
-        (coach_filter, COACH_EMAIL, per_bucket),
+        (coach_filter, coach_email, per_bucket),
     ).fetchall()
     samples["short"] = [dict(r) for r in rows]
 
@@ -99,7 +121,7 @@ def get_stratified_coach_sample(db: Database, per_bucket: int = 100) -> dict[str
            WHERE (speaker_name LIKE ? OR speaker_email = ?)
              AND LENGTH(text) BETWEEN 100 AND 500
            ORDER BY RANDOM() LIMIT ?""",
-        (coach_filter, COACH_EMAIL, per_bucket),
+        (coach_filter, coach_email, per_bucket),
     ).fetchall()
     samples["medium"] = [dict(r) for r in rows]
 
@@ -110,9 +132,79 @@ def get_stratified_coach_sample(db: Database, per_bucket: int = 100) -> dict[str
              AND text LIKE '%?%'
              AND LENGTH(text) > 30
            ORDER BY RANDOM() LIMIT ?""",
-        (coach_filter, COACH_EMAIL, per_bucket),
+        (coach_filter, coach_email, per_bucket),
     ).fetchall()
     samples["questions"] = [dict(r) for r in rows]
+
+    return samples
+
+
+def get_stratified_content_sample(
+    db: Database,
+    per_bucket: int = 100,
+) -> dict[str, list[dict]]:
+    """Get categorized samples from content_items for voice analysis.
+
+    Returns dict with keys: short_posts, medium_posts, long_form, openings, closings, questions
+    """
+    samples: dict[str, list[dict]] = {}
+
+    try:
+        # Short posts: < 500 chars
+        rows = db.conn.execute(
+            """SELECT text FROM content_items
+               WHERE char_count < 500
+               ORDER BY RANDOM() LIMIT ?""",
+            (per_bucket,),
+        ).fetchall()
+        samples["short"] = [dict(r) for r in rows]
+
+        # Medium posts: 500-2000 chars
+        rows = db.conn.execute(
+            """SELECT text FROM content_items
+               WHERE char_count BETWEEN 500 AND 2000
+               ORDER BY RANDOM() LIMIT ?""",
+            (per_bucket,),
+        ).fetchall()
+        samples["medium"] = [dict(r) for r in rows]
+
+        # Long form: > 2000 chars
+        rows = db.conn.execute(
+            """SELECT text FROM content_items
+               WHERE char_count > 2000
+               ORDER BY RANDOM() LIMIT ?""",
+            (per_bucket,),
+        ).fetchall()
+        samples["monologues"] = [dict(r) for r in rows]
+
+        # Openings: first 200 chars of each item
+        rows = db.conn.execute(
+            """SELECT SUBSTR(text, 1, 200) as text FROM content_items
+               ORDER BY RANDOM() LIMIT ?""",
+            (per_bucket,),
+        ).fetchall()
+        samples["openings"] = [dict(r) for r in rows]
+
+        # Closings: last 200 chars of each item
+        rows = db.conn.execute(
+            """SELECT SUBSTR(text, MAX(1, char_count - 200)) as text FROM content_items
+               WHERE char_count > 200
+               ORDER BY RANDOM() LIMIT ?""",
+            (per_bucket,),
+        ).fetchall()
+        samples["closings"] = [dict(r) for r in rows]
+
+        # Questions: items containing ?
+        rows = db.conn.execute(
+            """SELECT text FROM content_items
+               WHERE text LIKE '%?%'
+               AND char_count > 30
+               ORDER BY RANDOM() LIMIT ?""",
+            (per_bucket,),
+        ).fetchall()
+        samples["questions"] = [dict(r) for r in rows]
+    except Exception as e:
+        log.warning("Could not sample content_items: %s", e)
 
     return samples
 
@@ -130,27 +222,57 @@ def _format_turns(turns: list[dict], max_chars: int = MAX_CHARS_PER_BUCKET) -> s
     return "\n".join(lines)
 
 
+def _merge_samples(
+    turn_samples: dict[str, list[dict]],
+    content_samples: dict[str, list[dict]],
+) -> dict[str, list[dict]]:
+    """Merge turn-based and content-based samples into one dict."""
+    merged: dict[str, list[dict]] = {}
+    all_keys = set(list(turn_samples.keys()) + list(content_samples.keys()))
+    for key in all_keys:
+        merged[key] = turn_samples.get(key, []) + content_samples.get(key, [])
+    return merged
+
+
 def analyze_voice(
     db: Database,
     llm_client,
     sample_per_bucket: int = 100,
+    coach_name: str = COACH_NAME,
+    coach_email: str = COACH_EMAIL,
 ) -> str:
     """Run 3-pass voice analysis and return the final voice print markdown."""
-    stats = get_coach_turn_stats(db)
-    log.info(
-        "Coach stats: %d turns, %d chars, %d calls",
-        stats["turn_count"], stats["total_chars"], stats["call_count"],
-    )
+    # Gather samples from available sources
+    turn_stats = get_coach_turn_stats(db, coach_name, coach_email)
+    content_stats = get_content_item_stats(db)
 
-    samples = get_stratified_coach_sample(db, per_bucket=sample_per_bucket)
+    turn_samples: dict[str, list[dict]] = {}
+    content_samples: dict[str, list[dict]] = {}
+
+    if turn_stats["turn_count"] > 0:
+        log.info(
+            "Coach turn stats: %d turns, %d chars, %d calls",
+            turn_stats["turn_count"], turn_stats["total_chars"], turn_stats["call_count"],
+        )
+        turn_samples = get_stratified_coach_sample(db, per_bucket=sample_per_bucket,
+                                                    coach_name=coach_name, coach_email=coach_email)
+
+    if content_stats["item_count"] > 0:
+        log.info(
+            "Content item stats: %d items, %d chars",
+            content_stats["item_count"], content_stats["total_chars"],
+        )
+        content_samples = get_stratified_content_sample(db, per_bucket=sample_per_bucket)
+
+    samples = _merge_samples(turn_samples, content_samples)
+
     log.info(
-        "Samples: %s",
+        "Combined samples: %s",
         {k: len(v) for k, v in samples.items()},
     )
 
     # --- Pass 1: Vocabulary and patterns ---
-    # Combine medium + short + monologue turns for general vocabulary analysis
-    all_general = samples["medium"] + samples["short"] + samples["monologues"]
+    all_general = samples.get("medium", []) + samples.get("short", []) + samples.get("monologues", [])
     general_text = _format_turns(all_general, max_chars=MAX_TOTAL_CHARS // 2)
 
     pass1_result = complete_with_retry(
@@ -170,10 +292,10 @@ def analyze_voice(
         llm_client,
         system=VOICE_PASS2_SYSTEM,
         user=VOICE_PASS2_USER.format(
-            openings=_format_turns(samples["openings"]),
-            closings=_format_turns(samples["closings"]),
-            monologues=_format_turns(samples["monologues"]),
-            questions=_format_turns(samples["questions"]),
+            openings=_format_turns(samples.get("openings", [])),
+            closings=_format_turns(samples.get("closings", [])),
+            monologues=_format_turns(samples.get("monologues", [])),
+            questions=_format_turns(samples.get("questions", [])),
         ),
         max_tokens=4096,
     )
@@ -184,7 +306,7 @@ def analyze_voice(
         llm_client,
         system=VOICE_PASS3_SYSTEM,
         user=VOICE_PASS3_USER.format(
-            coach_name=COACH_NAME,
+            coach_name=coach_name,
             pass1_result=pass1_result.content,
             pass2_result=pass2_result.content,
         ),
