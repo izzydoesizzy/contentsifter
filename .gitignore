@@ -24,6 +24,9 @@ data/
 # Transcripts (private coaching call data)
 transcripts/
 
+# Reference materials (private source content)
+reference/
+
 # Python packaging
 *.egg-info/
 dist/
