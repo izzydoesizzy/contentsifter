@@ -22,5 +22,9 @@ dev = [
 [project.scripts]
 contentsifter = "contentsifter.cli:cli"
 
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-v --tb=short"
+
 [tool.setuptools.packages.find]
 where = ["src"]
