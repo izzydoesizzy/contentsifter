@@ -93,12 +93,12 @@ class TestHardCleanup:
     def test_removes_em_dashes(self):
         result = _hard_cleanup("work — life")
         assert "—" not in result
-        assert "work" in result and "life" in result
+        assert result == "work. Life"
 
     def test_removes_en_dashes(self):
         result = _hard_cleanup("work – life")
         assert "–" not in result
-        assert "work" in result and "life" in result
+        assert result == "work. Life"
 
     def test_no_double_periods(self):
         result = _hard_cleanup("end.— start")

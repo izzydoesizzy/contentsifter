@@ -10,7 +10,7 @@
       </button>
       <form hx-post="/{{ current_client.slug }}/generate/save"
             hx-target="#save-result" hx-swap="innerHTML" class="inline">
-        <input type="hidden" name="content" value="{{ draft_escaped }}">
+        <input type="hidden" name="content" value="{{ draft }}">
         <input type="hidden" name="topic" value="{{ topic }}">
         <input type="hidden" name="format_type" value="{{ format_type }}">
         <button type="submit" class="action-btn text-xs text-indigo-600 hover:text-indigo-800 font-medium"

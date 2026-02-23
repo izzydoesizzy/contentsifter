@@ -114,9 +114,10 @@ def _hard_cleanup(text: str) -> str:
     """
     import re
 
-    # Em dashes → period + space
-    text = text.replace("—", ". ")
-    text = text.replace("–", ". ")
+    # Em/en dashes → period + space (consume surrounding whitespace)
+    text = re.sub(r"\s*[—–]\s*", ". ", text)
+    # Capitalize first letter after a new sentence created by dash replacement
+    text = re.sub(r"\. ([a-z])", lambda m: ". " + m.group(1).upper(), text)
     # Clean up double periods or period-comma from replacement
     text = re.sub(r"\.\s*\.", ".", text)
     text = re.sub(r"\.\s*,", ",", text)
