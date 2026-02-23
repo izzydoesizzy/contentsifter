@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import html as html_mod
 import re
+from pathlib import Path
 
 
 def simple_md_to_html(md: str) -> str:
@@ -178,3 +179,56 @@ def _inline_format(text: str) -> str:
     # Italic: *text*
     text = re.sub(r"\*(.+?)\*", r"<em>\1</em>", text)
     return text
+
+
+def parse_draft(path: Path) -> dict:
+    """Parse a saved draft markdown file into metadata + content."""
+    text = path.read_text()
+    lines = text.split("\n")
+
+    title = path.stem
+    format_type = ""
+    body = text
+
+    # Extract title from first H1
+    if lines and lines[0].startswith("# "):
+        title = lines[0][2:].strip()
+
+    # Extract format from *Format: ...* line
+    for line in lines[1:6]:
+        m = re.match(r"\*Format:\s*(.+?)(?:\s*\|.*)?\*", line)
+        if m:
+            format_type = m.group(1).strip()
+            break
+
+    # Body is everything after the --- separator
+    separator_idx = None
+    for i, line in enumerate(lines):
+        if line.strip() == "---" and i > 0:
+            separator_idx = i
+            break
+    if separator_idx is not None:
+        body = "\n".join(lines[separator_idx + 1 :]).strip()
+    else:
+        body = "\n".join(lines[2:]).strip()
+
+    # Try to extract date from filename
+    date_str = ""
+    fname = path.stem
+    m = re.match(r"(\d{4}-\d{2}-\d{2})", fname)
+    if m:
+        date_str = m.group(1)
+    else:
+        m = re.search(r"(\d{4})(\d{2})(\d{2})", fname)
+        if m:
+            date_str = f"{m.group(1)}-{m.group(2)}-{m.group(3)}"
+
+    return {
+        "filename": path.name,
+        "title": title,
+        "format_type": format_type,
+        "date": date_str,
+        "body": body,
+        "snippet": body[:200].replace("\n", " ").strip(),
+        "mtime": path.stat().st_mtime,
+    }

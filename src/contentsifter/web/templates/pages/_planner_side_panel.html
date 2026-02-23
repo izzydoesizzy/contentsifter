@@ -1,0 +1,116 @@
+<!-- Side panel header -->
+<div class="flex items-center justify-between px-5 py-4 border-b border-zinc-100">
+  <div>
+    <h2 class="text-base font-semibold text-zinc-900">{{ day.day_name }} &middot; {{ day.date }}</h2>
+    <div class="flex items-center gap-2 mt-1">
+      <span class="badge badge-{{ day.format_type }} text-xs">{{ day.pillar }}</span>
+      <span class="text-xs text-zinc-400">{{ day.platform }}</span>
+    </div>
+  </div>
+  <button onclick="closeSidePanel()"
+          class="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 transition-colors">
+    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+  </button>
+</div>
+
+{% if slot %}
+<form hx-put="/{{ current_client.slug }}/planner/slot/{{ day.day_name }}"
+      hx-target="#slot-{{ day.day_name }}"
+      hx-swap="innerHTML"
+      class="flex flex-col h-[calc(100vh-72px)]">
+  <input type="hidden" name="week" value="{{ week_start }}">
+
+  <div class="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+    <!-- Status -->
+    <div>
+      <label class="block text-xs font-medium text-zinc-500 mb-1">Status</label>
+      <select name="status"
+              class="w-full px-3 py-2 text-sm border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+        <option value="draft" {{ 'selected' if slot.status == 'draft' }}>Draft</option>
+        <option value="ready" {{ 'selected' if slot.status == 'ready' }}>Ready</option>
+        <option value="needs_revision" {{ 'selected' if slot.status == 'needs_revision' }}>Needs Revision</option>
+      </select>
+    </div>
+
+    <!-- Title -->
+    <div>
+      <label class="block text-xs font-medium text-zinc-500 mb-1">Title</label>
+      <input type="text" name="title" value="{{ slot.title or '' }}"
+             class="w-full px-3 py-2 text-sm border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+             placeholder="Content title">
+    </div>
+
+    <!-- Content -->
+    <div class="flex-1">
+      <label class="block text-xs font-medium text-zinc-500 mb-1">Content</label>
+      <textarea name="content"
+                rows="14"
+                class="w-full px-3 py-2 text-sm border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent font-mono leading-relaxed resize-y"
+                placeholder="Draft content...">{{ slot.content or '' }}</textarea>
+    </div>
+
+    <!-- Notes -->
+    <div>
+      <label class="block text-xs font-medium text-zinc-500 mb-1">Notes</label>
+      <textarea name="notes"
+                rows="3"
+                class="w-full px-3 py-2 text-sm border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-y"
+                placeholder="Internal notes (not exported)...">{{ slot.notes or '' }}</textarea>
+    </div>
+
+    <!-- Source info -->
+    {% if slot.source_draft %}
+    <div class="pt-2 border-t border-zinc-100">
+      <p class="text-xs text-zinc-400">Source: <span class="font-mono">{{ slot.source_draft }}</span></p>
+    </div>
+    {% endif %}
+    {% if slot.extraction_ids %}
+    <div class="pt-2 border-t border-zinc-100">
+      <p class="text-xs text-zinc-400">Source extractions: {{ slot.extraction_ids }}</p>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Actions footer -->
+  <div class="px-5 py-4 border-t border-zinc-100 space-y-2">
+    <div class="flex gap-2">
+      <button type="submit"
+              class="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+        Save
+      </button>
+      <button type="button"
+              onclick="copySlotContent()"
+              class="action-btn px-3 py-2 text-sm text-zinc-600 hover:text-zinc-900 border border-zinc-200 rounded-lg hover:bg-zinc-50 transition-colors">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+      </button>
+    </div>
+    <div class="flex gap-2">
+      {% if has_api_key %}
+      <button type="button"
+              hx-post="/{{ current_client.slug }}/planner/slot/{{ day.day_name }}/generate"
+              hx-target="#slot-{{ day.day_name }}"
+              hx-swap="innerHTML"
+              hx-vals='{"week": "{{ week_start }}"}'
+              onclick="closeSidePanel()"
+              class="flex-1 text-sm text-zinc-600 hover:text-zinc-900 border border-zinc-200 rounded-lg py-2 hover:bg-zinc-50 transition-colors">
+        Regenerate
+      </button>
+      {% endif %}
+      <button type="button"
+              hx-delete="/{{ current_client.slug }}/planner/slot/{{ day.day_name }}/clear?week={{ week_start }}"
+              hx-target="#slot-{{ day.day_name }}"
+              hx-swap="innerHTML"
+              hx-confirm="Clear this slot?"
+              onclick="closeSidePanel()"
+              class="text-sm text-rose-600 hover:text-rose-700 border border-rose-200 rounded-lg px-3 py-2 hover:bg-rose-50 transition-colors">
+        Clear
+      </button>
+    </div>
+  </div>
+</form>
+{% else %}
+<div class="px-5 py-8 text-center">
+  <p class="text-sm text-zinc-400">This slot is empty.</p>
+</div>
+{% endif %}

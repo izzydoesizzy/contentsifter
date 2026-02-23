@@ -5,7 +5,7 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 SCHEMA_SQL = """
 -- Individual coaching calls parsed from merged markdown files
@@ -208,6 +208,27 @@ CREATE INDEX IF NOT EXISTS idx_extractions_chunk ON extractions(chunk_id);
 CREATE INDEX IF NOT EXISTS idx_extraction_tags_tag ON extraction_tags(tag_id);
 CREATE INDEX IF NOT EXISTS idx_participants_call ON participants(call_id);
 CREATE INDEX IF NOT EXISTS idx_processing_log_status ON processing_log(status);
+
+-- Weekly content planner slots
+CREATE TABLE IF NOT EXISTS calendar_plans (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    week_start      TEXT NOT NULL,
+    day_name        TEXT NOT NULL,
+    pillar          TEXT NOT NULL,
+    format_type     TEXT NOT NULL,
+    platform        TEXT NOT NULL,
+    status          TEXT NOT NULL DEFAULT 'empty',
+    title           TEXT,
+    content         TEXT,
+    source_draft    TEXT,
+    extraction_ids  TEXT,
+    topic           TEXT,
+    notes           TEXT,
+    created_at      TEXT DEFAULT (datetime('now')),
+    updated_at      TEXT DEFAULT (datetime('now')),
+    UNIQUE(week_start, day_name)
+);
+CREATE INDEX IF NOT EXISTS idx_calendar_plans_week ON calendar_plans(week_start);
 """
 
 
@@ -231,13 +252,18 @@ class Database:
     def initialize(self):
         """Create all tables if they don't exist."""
         self.conn.executescript(SCHEMA_SQL)
-        # Set schema version if not present
+        # Set schema version if not present, or update if behind
         row = self.conn.execute(
             "SELECT version FROM schema_version LIMIT 1"
         ).fetchone()
         if row is None:
             self.conn.execute(
                 "INSERT INTO schema_version (version) VALUES (?)",
+                (SCHEMA_VERSION,),
+            )
+        elif row["version"] < SCHEMA_VERSION:
+            self.conn.execute(
+                "UPDATE schema_version SET version = ?",
                 (SCHEMA_VERSION,),
             )
         self.conn.commit()

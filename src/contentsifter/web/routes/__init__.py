@@ -14,6 +14,7 @@ def register_routes(app: FastAPI):
         generate,
         ingest,
         interview,
+        planner,
         search,
         status,
         voiceprint,
@@ -24,6 +25,7 @@ def register_routes(app: FastAPI):
     app.include_router(drafts.router)
     app.include_router(ingest.router)
     app.include_router(interview.router)
+    app.include_router(planner.router)
     app.include_router(search.router)
     app.include_router(status.router)
     app.include_router(voiceprint.router)

@@ -142,3 +142,176 @@ function deleteDraft(id, slug, filename) {
     htmx.ajax('DELETE', '/' + slug + '/drafts/' + filename, {target: '#draft-' + id, swap: 'outerHTML'});
   }, 250);
 }
+
+// ===== Drafts: Batch Selection =====
+
+function updateBatchToolbar() {
+  var checkboxes = document.querySelectorAll('.draft-checkbox');
+  var checked = document.querySelectorAll('.draft-checkbox:checked');
+  var toolbar = document.getElementById('batch-toolbar');
+  var countEl = document.getElementById('batch-count');
+  var selectAll = document.getElementById('select-all-checkbox');
+
+  if (!toolbar) return;
+
+  if (checked.length > 0) {
+    toolbar.classList.remove('hidden');
+    countEl.textContent = checked.length + ' selected';
+  } else {
+    toolbar.classList.add('hidden');
+  }
+
+  // Update "select all" checkbox state
+  if (selectAll) {
+    selectAll.checked = checkboxes.length > 0 && checked.length === checkboxes.length;
+    selectAll.indeterminate = checked.length > 0 && checked.length < checkboxes.length;
+  }
+}
+
+function toggleSelectAllDrafts(selectAllCheckbox) {
+  var checkboxes = document.querySelectorAll('.draft-checkbox');
+  checkboxes.forEach(function(cb) { cb.checked = selectAllCheckbox.checked; });
+  updateBatchToolbar();
+}
+
+function batchDeleteDrafts(slug) {
+  var checked = document.querySelectorAll('.draft-checkbox:checked');
+  if (checked.length === 0) return;
+
+  if (!confirm('Delete ' + checked.length + ' draft' + (checked.length > 1 ? 's' : '') + '?')) return;
+
+  // Build form data with all selected filenames
+  var formData = new FormData();
+  checked.forEach(function(cb) {
+    formData.append('filenames', cb.dataset.filename);
+  });
+
+  // htmx.ajax doesn't support FormData with repeated keys, so use fetch
+  fetch('/' + slug + '/drafts/batch-delete', {
+    method: 'POST',
+    body: formData,
+  })
+  .then(function(response) { return response.text(); })
+  .then(function(html) {
+    document.getElementById('drafts-container').innerHTML = html;
+    // Update the count in the header
+    var remaining = document.querySelectorAll('.draft-checkbox').length;
+    var countEl = document.querySelector('#drafts-count, .text-sm.text-zinc-500');
+    // Trigger flash auto-dismiss
+    document.querySelectorAll('[data-flash]').forEach(function(el) {
+      setTimeout(function() {
+        el.style.opacity = '0';
+        el.style.transition = 'opacity 0.3s ease';
+        setTimeout(function() { el.remove(); }, 300);
+      }, 4000);
+    });
+  });
+}
+
+// ===== Content Planner: Drag & Drop =====
+
+function handleSlotDragOver(event) {
+  event.preventDefault();
+  event.currentTarget.classList.add('drag-over');
+}
+
+function handleSlotDragLeave(event) {
+  event.currentTarget.classList.remove('drag-over');
+}
+
+function handleSlotDrop(event) {
+  event.preventDefault();
+  event.currentTarget.classList.remove('drag-over');
+
+  const filename = event.dataTransfer.getData('text/draft-filename');
+  const sourceDayName = event.dataTransfer.getData('text/card-day');
+  const slot = event.currentTarget;
+  const dayName = slot.dataset.day;
+  const slug = slot.dataset.slug;
+  const week = slot.dataset.week;
+
+  if (filename && dayName) {
+    // Dropping a saved draft onto a slot
+    htmx.ajax('POST',
+      '/' + slug + '/planner/slot/' + dayName + '/assign-draft',
+      {
+        target: '#slot-' + dayName,
+        swap: 'innerHTML',
+        values: { filename: filename, week: week }
+      }
+    );
+  } else if (sourceDayName && sourceDayName !== dayName) {
+    // Swapping cards between slots — swap via both updates
+    // For now, just notify user
+    console.log('Card swap from', sourceDayName, 'to', dayName, '(not yet supported)');
+  }
+}
+
+function handleDraftDragStart(event) {
+  event.dataTransfer.setData('text/draft-filename', event.target.dataset.filename);
+  event.dataTransfer.effectAllowed = 'copy';
+  event.target.classList.add('dragging');
+}
+
+function handleDraftDragEnd(event) {
+  event.target.classList.remove('dragging');
+  document.querySelectorAll('.drag-over').forEach(function(el) { el.classList.remove('drag-over'); });
+}
+
+function handleCardDragStart(event) {
+  event.dataTransfer.setData('text/card-day', event.target.dataset.day);
+  event.dataTransfer.effectAllowed = 'move';
+  event.target.classList.add('dragging');
+}
+
+function handleCardDragEnd(event) {
+  event.target.classList.remove('dragging');
+  document.querySelectorAll('.drag-over').forEach(function(el) { el.classList.remove('drag-over'); });
+}
+
+// ===== Content Planner: Side Panel =====
+
+function openSidePanel(slug, dayName, weekStart) {
+  var panel = document.getElementById('side-panel');
+  var overlay = document.getElementById('side-panel-overlay');
+  panel.classList.remove('hidden');
+  if (overlay) overlay.classList.remove('hidden');
+
+  htmx.ajax('GET',
+    '/' + slug + '/planner/side-panel/' + dayName + '?week=' + weekStart,
+    { target: '#side-panel-content', swap: 'innerHTML' }
+  );
+
+  var grid = document.getElementById('planner-grid');
+  if (grid) grid.classList.add('panel-open');
+}
+
+function closeSidePanel() {
+  var panel = document.getElementById('side-panel');
+  var overlay = document.getElementById('side-panel-overlay');
+  panel.classList.add('hidden');
+  if (overlay) overlay.classList.add('hidden');
+
+  var grid = document.getElementById('planner-grid');
+  if (grid) grid.classList.remove('panel-open');
+}
+
+function copySlotContent() {
+  var textarea = document.querySelector('.planner-side-panel textarea[name="content"]');
+  if (!textarea) return;
+  navigator.clipboard.writeText(textarea.value).then(function() {
+    // Brief feedback
+    var btn = document.querySelector('.planner-side-panel .action-btn');
+    if (btn) showCopyFeedback(btn);
+  });
+}
+
+// ===== Content Planner: Drafts Drawer =====
+
+function toggleDraftsDrawer() {
+  var drawer = document.getElementById('drafts-drawer');
+  var chevron = document.getElementById('drawer-chevron');
+  if (!drawer) return;
+  drawer.classList.toggle('expanded');
+  if (chevron) chevron.classList.toggle('rotated');
+}

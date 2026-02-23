@@ -1,0 +1,25 @@
+{% if drafts %}
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-3 pb-4">
+  {% for draft in drafts %}
+  <div class="draft-draggable bg-white border border-zinc-200 rounded-lg p-3 cursor-grab hover:border-indigo-200 hover:shadow-sm transition-all"
+       draggable="true"
+       data-filename="{{ draft.filename }}"
+       ondragstart="handleDraftDragStart(event)"
+       ondragend="handleDraftDragEnd(event)">
+    <div class="flex items-center gap-1.5 mb-1">
+      <svg class="w-3 h-3 text-zinc-300 grip-handle" viewBox="0 0 24 24" fill="currentColor">
+        <circle cx="8" cy="6" r="1.5"/><circle cx="16" cy="6" r="1.5"/>
+        <circle cx="8" cy="12" r="1.5"/><circle cx="16" cy="12" r="1.5"/>
+      </svg>
+      {% if draft.format_type %}
+      <span class="badge badge-{{ draft.format_type }} text-xs">{{ draft.format_type }}</span>
+      {% endif %}
+    </div>
+    <p class="text-sm font-medium text-zinc-800 line-clamp-2">{{ draft.title }}</p>
+    <p class="mt-1 text-xs text-zinc-400 line-clamp-2">{{ draft.snippet[:80] }}</p>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<p class="text-sm text-zinc-400 pb-4">No saved drafts available. <a href="/{{ current_client.slug }}/generate" class="text-indigo-600 hover:underline">Generate some first.</a></p>
+{% endif %}
