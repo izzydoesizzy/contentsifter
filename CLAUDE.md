@@ -113,10 +113,13 @@ contentsifter web --reload        # Auto-reload on code changes (development)
 | `/` | Redirect | Redirects to default client dashboard |
 | `/{slug}` | Dashboard | Stat cards, quick actions, content breakdown |
 | `/clients/` | Clients | Client list table with inline create form (htmx) |
-| `/clients/{slug}` | Client Detail | Client info, stats, set-default button |
+| `/clients/{slug}` | Client Detail | Client settings, API key, set-default |
 | `/{slug}/ingest` | Upload | Drag/drop file upload with content type selector |
-| `/{slug}/search` | Search | Live FTS5 search with category filter dropdown |
-| `/{slug}/interview` | Interview | Generate questionnaire, inline markdown preview |
+| `/{slug}/search` | Search | Live FTS5 search, category browse, generate from results |
+| `/{slug}/generate` | Generate | Topic-based draft generation with format picker |
+| `/{slug}/drafts` | Drafts | Browse, expand, copy, delete saved drafts |
+| `/{slug}/voice-print` | Voice Print | Generate and preview voice profile |
+| `/{slug}/interview` | Interview | Generate questionnaire, structured preview |
 | `/{slug}/status` | Status | Pipeline progress bars, content breakdown, suggestions |
 
 ### Auto-Format (AI Upload)
@@ -185,14 +188,11 @@ contentsifter sift --input ./transcripts/       # Full pipeline (parse + chunk +
 contentsifter search "query" --semantic         # Semantic search (Claude re-ranking)
 contentsifter generate -q "topic" -f linkedin   # Generate drafts
 contentsifter generate -q "topic" -f video-script --save  # Generate + save to drafts/
-contentsifter generate -q "topic" -f carousel --no-voice-print  # Without voice matching
-contentsifter generate -q "topic" -f linkedin --skip-gates     # Skip content gates
 contentsifter voice-print                       # Generate voice profile
 contentsifter voice-print --force               # Regenerate voice profile
 contentsifter voice-print --sample-size 150     # More samples per bucket
 contentsifter plan-week                         # Full weekly calendar with LLM drafts
 contentsifter plan-week --topic-focus networking  # Focus on a specific tag
-contentsifter plan-week --skip-gates            # Skip content gates
 contentsifter plan-week --week-of 2026-03-10    # Specific week
 ```
 
@@ -217,11 +217,12 @@ process_calls(call_ids=[3,4,5], llm_client=llm)
 `linkedin`, `newsletter`, `thread`, `playbook`, `video-script`, `carousel`, `email-welcome`, `email-weekly`, `email-sales`
 
 ## Content Gates
-Every generated draft passes through two validation gates (in order):
+Every generated draft passes through three validation stages (in order):
 1. **AI Gate** (`content/ai-gate.md`) — Catches AI-sounding patterns (em dashes, hedging, five-dollar words, formulaic structure)
 2. **Voice Gate** (client's `voice-print.md`) — Rewrites to match client's voice (tone, vocabulary, sentence patterns, energy)
+3. **Hard Cleanup** — Regex backstop that strips any remaining em dashes, markdown asterisks, and decorative emoji
 
-Gates run automatically when voice print is enabled. Use `--skip-gates` to bypass.
+Gates always run on every generated draft. They cannot be skipped.
 
 ## Weekly Calendar Schedule
 | Day | Pillar | Format | Source Category |

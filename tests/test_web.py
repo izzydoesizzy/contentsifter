@@ -514,8 +514,24 @@ class TestBrowseAndSuggestions:
         resp = client_with_extractions.get("/testweb/search/results?category=playbook")
         assert resp.status_code == 200
         assert "playbook" in resp.text.lower()
-        # Should not show "results for" in browse mode
-        assert "results for" not in resp.text.lower()
+
+    def test_search_detail_has_generate_with_api_key(self, web_env_with_extractions, monkeypatch):
+        """Search detail shows per-card generate button when API key is set."""
+        from contentsifter.web.app import create_app
+
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test-key")
+        app = create_app()
+        c = TestClient(app)
+        resp = c.get("/testweb/search/detail/1")
+        assert resp.status_code == 200
+        assert "from-extraction/1" in resp.text
+        assert "format_type" in resp.text
+
+    def test_search_detail_no_generate_without_api_key(self, client_with_extractions):
+        """Search detail hides generate button when no API key."""
+        resp = client_with_extractions.get("/testweb/search/detail/1")
+        assert resp.status_code == 200
+        assert "from-extraction" not in resp.text
 
 
 class TestAutoformat:

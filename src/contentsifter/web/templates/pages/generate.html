@@ -52,24 +52,12 @@
       </div>
     </div>
 
-    <!-- Options row -->
-    <div class="flex flex-wrap gap-6 mb-4">
-      <label class="flex items-center gap-2 text-sm text-zinc-700 {% if not has_voice_print %}opacity-50{% endif %}">
-        <input type="checkbox" name="use_voice_print" {% if has_voice_print %}checked{% endif %}
-               {% if not has_voice_print %}disabled{% endif %}
-               class="rounded border-zinc-300 text-indigo-600 focus:ring-indigo-500">
-        Use voice print
-        {% if not has_voice_print %}
-        <span class="text-xs text-zinc-400">(not generated)</span>
-        {% endif %}
-      </label>
-      <label class="flex items-center gap-2 text-sm text-zinc-700">
-        <input type="checkbox" name="skip_gates"
-               class="rounded border-zinc-300 text-indigo-600 focus:ring-indigo-500">
-        Skip content gates
-        <span class="text-xs text-zinc-400">(faster)</span>
-      </label>
-    </div>
+    <!-- Voice print status -->
+    {% if has_voice_print %}
+    <p class="text-xs text-emerald-600 mb-4">Voice print and content gates will be applied automatically.</p>
+    {% else %}
+    <p class="text-xs text-amber-600 mb-4">No voice print found. <a href="/{{ current_client.slug }}/voice-print" class="underline">Generate one</a> for better results. Content gates will still run.</p>
+    {% endif %}
 
     <!-- Source preview -->
     <div id="source-preview" class="text-sm mb-4"></div>

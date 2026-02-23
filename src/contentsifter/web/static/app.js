@@ -83,15 +83,23 @@ function searchFor(term) {
 }
 
 // Copy draft content to clipboard
-function copyDraft() {
+function copyDraft(button) {
   const el = document.getElementById('draft-content');
-  if (!el) return;
+  if (!el || !button) return;
   navigator.clipboard.writeText(el.textContent).then(() => {
-    const btn = event.target;
-    const original = btn.textContent;
-    btn.textContent = 'Copied!';
-    setTimeout(() => { btn.textContent = original; }, 1500);
+    showCopyFeedback(button);
   });
+}
+
+// Shared copy feedback animation
+function showCopyFeedback(btn) {
+  const original = btn.innerHTML;
+  btn.innerHTML = '<svg class="inline w-3.5 h-3.5 -mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> Copied!';
+  btn.classList.add('success');
+  setTimeout(() => {
+    btn.innerHTML = original;
+    btn.classList.remove('success');
+  }, 1500);
 }
 
 // Saved drafts: expand/collapse
@@ -111,18 +119,26 @@ function toggleDraft(id, url) {
 }
 
 // Saved drafts: copy body from expanded detail
-function copyDraftBody(id) {
+function copyDraftBody(id, button) {
   const detail = document.getElementById('draft-detail-' + id);
   if (!detail || !detail.dataset.loaded) return;
   const textEl = detail.querySelector('.whitespace-pre-wrap');
-  if (!textEl) return;
+  if (!textEl || !button) return;
   navigator.clipboard.writeText(textEl.textContent).then(() => {
-    // Flash feedback handled inline
+    showCopyFeedback(button);
   });
 }
 
-// Saved drafts: delete
+// Saved drafts: delete with fade-out
 function deleteDraft(id, slug, filename) {
   if (!confirm('Delete this draft?')) return;
-  htmx.ajax('DELETE', '/' + slug + '/drafts/' + filename, {target: '#draft-' + id, swap: 'outerHTML'});
+  const card = document.getElementById('draft-' + id);
+  if (card) {
+    card.style.transition = 'opacity 0.25s ease, transform 0.25s ease';
+    card.style.opacity = '0';
+    card.style.transform = 'translateX(8px)';
+  }
+  setTimeout(() => {
+    htmx.ajax('DELETE', '/' + slug + '/drafts/' + filename, {target: '#draft-' + id, swap: 'outerHTML'});
+  }, 250);
 }

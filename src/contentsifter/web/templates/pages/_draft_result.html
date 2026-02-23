@@ -5,7 +5,7 @@
       <span class="text-sm text-zinc-500">{{ source_count }} source{{ "s" if source_count != 1 }} used</span>
     </div>
     <div class="flex items-center gap-3">
-      <button onclick="copyDraft()" class="text-xs text-indigo-600 hover:text-indigo-800 font-medium">
+      <button onclick="copyDraft(this)" class="action-btn text-xs text-indigo-600 hover:text-indigo-800 font-medium">
         Copy
       </button>
       <form hx-post="/{{ current_client.slug }}/generate/save"
@@ -13,7 +13,8 @@
         <input type="hidden" name="content" value="{{ draft_escaped }}">
         <input type="hidden" name="topic" value="{{ topic }}">
         <input type="hidden" name="format_type" value="{{ format_type }}">
-        <button type="submit" class="text-xs text-indigo-600 hover:text-indigo-800 font-medium">Save</button>
+        <button type="submit" class="action-btn text-xs text-indigo-600 hover:text-indigo-800 font-medium"
+                hx-disabled-elt="this">Save</button>
       </form>
     </div>
   </div>

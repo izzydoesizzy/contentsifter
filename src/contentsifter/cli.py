@@ -672,14 +672,13 @@ def search(ctx, query, semantic, category, tag, date_from, date_to,
 @click.option("--category", "-c", multiple=True, help="Filter source by category")
 @click.option("--min-quality", type=int, default=3, help="Minimum quality for source material")
 @click.option("--limit", type=int, default=10, help="Max source items to use")
-@click.option("--voice-print/--no-voice-print", "use_voice_print", default=True,
-              help="Use voice print for tone matching (default: on if voice-print.md exists)")
 @click.option("--save", is_flag=True, help="Save draft to content/drafts/")
-@click.option("--skip-gates", is_flag=True, help="Skip AI detection and voice matching gates")
 @click.pass_context
-def generate(ctx, query, format_type, topic, category, min_quality, limit,
-             use_voice_print, save, skip_gates):
-    """Generate content drafts from search results."""
+def generate(ctx, query, format_type, topic, category, min_quality, limit, save):
+    """Generate content drafts from search results.
+
+    Voice print and content gates are always applied.
+    """
     from datetime import datetime
 
     from contentsifter.generate.drafts import generate_draft
@@ -691,12 +690,10 @@ def generate(ctx, query, format_type, topic, category, min_quality, limit,
     client_config = _get_client_config(ctx)
     llm = create_llm_client(ctx.obj["llm_mode"], ctx.obj["model"])
 
-    # Load voice print if available and requested
-    voice_print = None
-    if use_voice_print:
-        voice_print = load_voice_print(path=client_config.voice_print_path)
-        if voice_print:
-            console.print("[dim]Using voice print for tone matching.[/dim]")
+    # Always load voice print when available
+    voice_print = load_voice_print(path=client_config.voice_print_path)
+    if voice_print:
+        console.print("[dim]Using voice print for tone matching.[/dim]")
 
     filters = SearchFilters(
         categories=list(category),
@@ -712,18 +709,15 @@ def generate(ctx, query, format_type, topic, category, min_quality, limit,
         return
 
     console.print(f"Found [bold]{len(results)}[/bold] source items. Generating {format_type} draft...")
+    console.print("[dim]Content gates enabled (AI detection + voice matching).[/dim]")
 
     save_to = None
     if save:
         timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
         save_to = client_config.drafts_dir / f"{format_type}-{timestamp}.md"
 
-    if not skip_gates and voice_print:
-        console.print("[dim]Content gates enabled (AI detection + voice matching).[/dim]")
-
     draft = generate_draft(results, format_type, llm, topic,
-                           voice_print=voice_print, save_to=save_to,
-                           skip_gates=skip_gates)
+                           voice_print=voice_print, save_to=save_to)
 
     console.print()
     console.print("[bold]Generated Draft:[/bold]")
@@ -1363,10 +1357,12 @@ def voice_print_cmd(ctx, force, sample_size):
 @click.option("--week-of", type=str, help="Start date (YYYY-MM-DD, defaults to next Monday)")
 @click.option("--topic-focus", type=str, help="Optional tag to emphasize this week")
 @click.option("--no-llm", is_flag=True, help="Generate calendar without LLM drafts")
-@click.option("--skip-gates", is_flag=True, help="Skip AI detection and voice matching gates")
 @click.pass_context
-def plan_week(ctx, week_of, topic_focus, no_llm, skip_gates):
-    """Generate a weekly content calendar with suggested content for each day."""
+def plan_week(ctx, week_of, topic_focus, no_llm):
+    """Generate a weekly content calendar with suggested content for each day.
+
+    Voice print and content gates are always applied to generated drafts.
+    """
     from contentsifter.planning.calendar import generate_calendar
 
     db_path = ctx.obj["db_path"]
@@ -1383,8 +1379,7 @@ def plan_week(ctx, week_of, topic_focus, no_llm, skip_gates):
             console.print("[dim]No-LLM mode: source material only, no drafts.[/dim]")
         else:
             console.print("[dim]Generating drafts for each day (this may take a few minutes)...[/dim]")
-            if not skip_gates:
-                console.print("[dim]Content gates enabled (AI detection + voice matching).[/dim]")
+            console.print("[dim]Content gates enabled (AI detection + voice matching).[/dim]")
         console.print()
 
         markdown, output_path = generate_calendar(
@@ -1393,7 +1388,6 @@ def plan_week(ctx, week_of, topic_focus, no_llm, skip_gates):
             topic_focus=topic_focus,
             llm_client=llm,
             use_llm=not no_llm,
-            skip_gates=skip_gates,
             calendar_dir=client_config.calendar_dir,
             voice_print_path=client_config.voice_print_path,
         )

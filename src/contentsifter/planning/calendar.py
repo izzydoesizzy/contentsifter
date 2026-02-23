@@ -230,11 +230,12 @@ def generate_calendar(
     topic_focus: str | None = None,
     llm_client=None,
     use_llm: bool = True,
-    skip_gates: bool = False,
     calendar_dir: Path = CALENDAR_DIR,
     voice_print_path: Path | None = None,
 ) -> tuple[str, Path]:
     """Generate a weekly content calendar.
+
+    Voice print and content gates are always applied to generated drafts.
 
     Returns (markdown_content, output_path).
     """
@@ -263,7 +264,6 @@ def generate_calendar(
                     llm_client,
                     topic=items[0]["title"],
                     voice_print=voice_print,
-                    skip_gates=skip_gates,
                 )
                 drafts[day_name] = draft
             except Exception as e:

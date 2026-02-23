@@ -46,9 +46,11 @@ def generate_draft(
     topic: str | None = None,
     voice_print: str | None = None,
     save_to: Path | None = None,
-    skip_gates: bool = False,
 ) -> str:
     """Generate a content draft from search results.
+
+    All drafts pass through content gates (AI detection + voice matching +
+    hard cleanup). Voice print and gates are never skipped.
 
     Args:
         results: Search results to use as source material
@@ -57,7 +59,6 @@ def generate_draft(
         topic: Optional topic/title override
         voice_print: Optional voice print content for tone matching
         save_to: Optional path to save the draft as a markdown file
-        skip_gates: If True, skip the AI and voice content gates
     """
     if format_type not in TEMPLATES:
         raise ValueError(f"Unknown format: {format_type}. Choose from: {list(TEMPLATES.keys())}")
@@ -81,13 +82,12 @@ def generate_draft(
 
     draft = response.content
 
-    # Run content gates (AI detection + voice matching + hard cleanup)
-    if not skip_gates:
-        log.info("Running content gates on %s draft...", format_type)
-        ai_gate_doc = load_ai_gate()
-        draft = run_content_gates(
-            draft, llm_client, voice_print=voice_print, ai_gate_doc=ai_gate_doc
-        )
+    # Always run content gates (AI detection + voice matching + hard cleanup)
+    log.info("Running content gates on %s draft...", format_type)
+    ai_gate_doc = load_ai_gate()
+    draft = run_content_gates(
+        draft, llm_client, voice_print=voice_print, ai_gate_doc=ai_gate_doc
+    )
 
     if save_to:
         save_to.parent.mkdir(parents=True, exist_ok=True)

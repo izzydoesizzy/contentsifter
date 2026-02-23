@@ -6,7 +6,15 @@
       "email": "izzy@joinclearcareer.com",
       "db_path": "data/contentsifter.db",
       "content_dir": "content",
-      "description": "ClearCareer career coaching"
+      "description": "ClearCareer career coaching",
+      "api_key": "REDACTED_API_KEY"
+    },
+    "aileen-edwards": {
+      "name": "Aileen Edwards",
+      "email": "amedwards@ameconsulting.ca",
+      "db_path": "data/clients/aileen-edwards/contentsifter.db",
+      "content_dir": "content/clients/aileen-edwards",
+      "description": "Executive coach for women of colour"
     }
   }
 }

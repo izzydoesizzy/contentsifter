@@ -11,7 +11,8 @@ from contentsifter.config import load_client
 from contentsifter.search.filters import SearchFilters
 from contentsifter.search.keyword import browse_extractions, keyword_search
 from contentsifter.web.app import templates
-from contentsifter.web.deps import get_db
+from contentsifter.web.deps import get_db, has_api_key
+from contentsifter.web.routes.generate import FORMAT_OPTIONS  # used in search_detail
 from contentsifter.web.utils import simple_md_to_html
 
 router = APIRouter()
@@ -216,6 +217,41 @@ async def search_detail(request: Request, slug: str, extraction_id: int):
         <div class="flex flex-wrap items-center gap-3 pt-3 border-t border-zinc-100">
           <span class="text-xs text-zinc-500">{meta_html}</span>
           {f'<div class="flex flex-wrap gap-1.5">{tags_html}</div>' if tags_html else ''}
+        </div>
+        """)
+
+    # Generate bar (per-card)
+    if has_api_key(client):
+        options_html = "".join(
+            f'<option value="{v}">{l}</option>' for v, l in FORMAT_OPTIONS
+        )
+        eid = extraction_id
+        sections.append(f"""
+        <div class="mt-4 pt-4 border-t border-zinc-100" onclick="event.stopPropagation()">
+          <form hx-post="/{slug}/generate/from-extraction/{eid}"
+                hx-target="#card-draft-{eid}"
+                hx-swap="innerHTML"
+                hx-indicator="#card-gen-spinner-{eid}"
+                hx-timeout="120000"
+                class="flex items-center gap-3">
+            <span class="text-xs font-medium text-zinc-500 uppercase tracking-wider shrink-0">Generate</span>
+            <select name="format_type"
+                    class="px-2 py-1 text-xs border border-zinc-200 rounded-lg bg-white text-zinc-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+              {options_html}
+            </select>
+            <button type="submit" hx-disabled-elt="this"
+                    class="inline-flex items-center gap-1 px-3 py-1 text-xs font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50">
+              <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+              Draft
+            </button>
+            <div id="card-gen-spinner-{eid}" class="htmx-indicator">
+              <svg class="animate-spin h-4 w-4 text-indigo-500" viewBox="0 0 24 24" fill="none">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+              </svg>
+            </div>
+          </form>
+          <div id="card-draft-{eid}" class="mt-3"></div>
         </div>
         """)
 

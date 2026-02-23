@@ -19,7 +19,14 @@ templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 def _setup_template_globals():
     from contentsifter.config import list_clients
 
+    def draft_count(client) -> int:
+        """Count saved draft files for a client."""
+        if client and hasattr(client, "drafts_dir") and client.drafts_dir.exists():
+            return len(list(client.drafts_dir.glob("*.md")))
+        return 0
+
     templates.env.globals["list_all_clients"] = list_clients
+    templates.env.globals["draft_count"] = draft_count
 
 _setup_template_globals()
 
