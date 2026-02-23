@@ -111,7 +111,7 @@ async def voice_print_preview(request: Request, slug: str):
 
     html = simple_md_to_html(content)
     return HTMLResponse(f"""
-    <div class="prose prose-sm max-w-none text-zinc-700 leading-relaxed">
+    <div class="prose-custom max-w-none">
       {html}
     </div>
     """)

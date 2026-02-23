@@ -317,6 +317,64 @@ class TestGenerate:
         assert len(saved_files) == 1
 
 
+class TestMarkdownRenderer:
+    def test_table_renders_html(self):
+        from contentsifter.web.utils import simple_md_to_html
+        md = "| Name | Age |\n|------|-----|\n| Alice | 30 |\n| Bob | 25 |"
+        html = simple_md_to_html(md)
+        assert "<table" in html
+        assert "<th>" in html
+        assert "Alice" in html
+        assert "Bob" in html
+
+    def test_blockquote_renders(self):
+        from contentsifter.web.utils import simple_md_to_html
+        md = "> This is a quote\n> Second line"
+        html = simple_md_to_html(md)
+        assert "<blockquote" in html
+        assert "This is a quote" in html
+
+    def test_paragraph_spacing(self):
+        from contentsifter.web.utils import simple_md_to_html
+        md = "First paragraph.\n\nSecond paragraph."
+        html = simple_md_to_html(md)
+        assert "mb-3" in html
+        assert "First paragraph" in html
+        assert "Second paragraph" in html
+
+    def test_heading_ids(self):
+        from contentsifter.web.utils import simple_md_to_html
+        md = "## Quick Reference"
+        html = simple_md_to_html(md)
+        assert 'id="quick-reference"' in html
+
+    def test_h3_renders(self):
+        from contentsifter.web.utils import simple_md_to_html
+        md = "### Sub Section"
+        html = simple_md_to_html(md)
+        assert "<h3" in html
+        assert "Sub Section" in html
+
+    def test_inline_code(self):
+        from contentsifter.web.utils import simple_md_to_html
+        md = "Use `contentsifter search` to find content."
+        html = simple_md_to_html(md)
+        assert "<code" in html
+        assert "contentsifter search" in html
+
+
+class TestSearchDetail:
+    def test_search_detail_no_extraction(self, client_with_db):
+        resp = client_with_db.get("/testweb/search/detail/99999")
+        assert resp.status_code == 200
+        assert "not found" in resp.text
+
+    def test_search_results_returns_template(self, client_with_db):
+        resp = client_with_db.get("/testweb/search/results?q=nonexistent")
+        assert resp.status_code == 200
+        assert "No results" in resp.text
+
+
 class TestAutoformat:
     def test_needs_formatting_linkedin_with_dividers(self):
         from contentsifter.ingest.autoformat import needs_formatting

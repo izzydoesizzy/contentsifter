@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import html as html_mod
+
 from fastapi import APIRouter, Query, Request
 from fastapi.responses import HTMLResponse
 
@@ -10,6 +12,7 @@ from contentsifter.search.filters import SearchFilters
 from contentsifter.search.keyword import keyword_search
 from contentsifter.web.app import templates
 from contentsifter.web.deps import get_db
+from contentsifter.web.utils import simple_md_to_html
 
 router = APIRouter()
 
@@ -49,42 +52,119 @@ async def search_results(
             results = []
 
     if not results:
-        return HTMLResponse(f'<p class="text-sm text-zinc-400 py-4">No results for &ldquo;{q}&rdquo;</p>')
-
-    cards = []
-    for r in results:
-        title = r.get("title", "Untitled")
-        cat = r.get("category", "other")
-        content = r.get("content", "")
-        if len(content) > 200:
-            content = content[:197] + "..."
-        tags = r.get("tags", [])
-        quality = r.get("quality_score", 0)
-        call_title = r.get("call_title", "")
-        call_date = r.get("call_date", "")
-
-        tags_html = " ".join(
-            f'<span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-zinc-100 text-zinc-600">{t}</span>'
-            for t in tags[:5]
+        return HTMLResponse(
+            f'<p class="text-sm text-zinc-400 py-4">No results for &ldquo;{q}&rdquo;</p>'
         )
 
-        import html as html_mod
-        cards.append(f"""
-        <div class="bg-white rounded-xl border border-zinc-200 p-5 hover:border-indigo-200 transition-colors">
-          <div class="flex items-start justify-between mb-2">
-            <h3 class="text-sm font-medium text-zinc-900">{html_mod.escape(title)}</h3>
-            <span class="badge badge-{cat} ml-2 shrink-0">{cat}</span>
-          </div>
-          <p class="text-sm text-zinc-600 mb-3 leading-relaxed">{html_mod.escape(content)}</p>
-          <div class="flex items-center justify-between">
-            <div class="flex flex-wrap gap-1">{tags_html}</div>
-            <span class="text-xs text-zinc-400">{html_mod.escape(call_date[:10] if call_date else "")}</span>
-          </div>
+    # Build display-ready results with snippet
+    display_results = []
+    for r in results:
+        content = r.get("content", "")
+        snippet = content[:200] + "..." if len(content) > 200 else content
+        display_results.append({
+            **r,
+            "snippet": snippet,
+        })
+
+    return templates.TemplateResponse("pages/_search_results.html", {
+        "request": request,
+        "results": display_results,
+        "query": q,
+        "slug": slug,
+    })
+
+
+@router.get("/{slug}/search/detail/{extraction_id}")
+async def search_detail(request: Request, slug: str, extraction_id: int):
+    """Return full extraction detail as HTML fragment (htmx expand-in-place)."""
+    client = load_client(slug)
+
+    with get_db(client) as db:
+        row = db.conn.execute(
+            """SELECT e.id, e.category, e.title, e.content, e.raw_quote,
+                      e.speaker, e.quality_score, e.context_note,
+                      c.title as call_title, c.call_date, c.call_type
+               FROM extractions e
+               JOIN calls c ON c.id = e.call_id
+               WHERE e.id = ?""",
+            (extraction_id,),
+        ).fetchone()
+
+        if not row:
+            return HTMLResponse(
+                '<p class="text-sm text-zinc-400 py-2">Extraction not found.</p>'
+            )
+
+        # Get all tags
+        tag_rows = db.conn.execute(
+            """SELECT t.name FROM tags t
+               JOIN extraction_tags et ON t.id = et.tag_id
+               WHERE et.extraction_id = ?""",
+            (extraction_id,),
+        ).fetchall()
+
+    tags = [t["name"] for t in tag_rows]
+    content_html = simple_md_to_html(row["content"]) if row["content"] else ""
+    raw_quote = html_mod.escape(row["raw_quote"]) if row["raw_quote"] else ""
+
+    # Build metadata line
+    meta_parts = []
+    if row["speaker"]:
+        meta_parts.append(f'<span class="font-medium">{html_mod.escape(row["speaker"])}</span>')
+    if row["call_title"]:
+        meta_parts.append(html_mod.escape(row["call_title"]))
+    if row["call_type"]:
+        meta_parts.append(html_mod.escape(row["call_type"]))
+    meta_html = " &middot; ".join(meta_parts)
+
+    # Tags
+    tags_html = " ".join(
+        f'<span class="tag-pill">{html_mod.escape(t)}</span>'
+        for t in tags
+    )
+
+    # Build detail HTML
+    sections = []
+
+    # Divider
+    sections.append('<hr class="my-4 border-zinc-100">')
+
+    # Full content
+    if content_html:
+        sections.append(f"""
+        <div class="mb-4">
+          <p class="text-xs font-medium text-zinc-400 uppercase tracking-wider mb-2">Full Content</p>
+          <div class="prose-custom">{content_html}</div>
         </div>
         """)
 
-    count_text = f'{len(results)} result{"s" if len(results) != 1 else ""}'
-    return HTMLResponse(
-        f'<p class="text-xs text-zinc-400 mb-3">{count_text}</p>'
-        f'<div class="space-y-3">{"".join(cards)}</div>'
-    )
+    # Raw quote
+    if raw_quote:
+        sections.append(f"""
+        <div class="mb-4">
+          <p class="text-xs font-medium text-zinc-400 uppercase tracking-wider mb-2">Original Quote</p>
+          <blockquote class="prose-blockquote">
+            <p>{raw_quote}</p>
+          </blockquote>
+        </div>
+        """)
+
+    # Context note
+    if row["context_note"]:
+        sections.append(f"""
+        <div class="mb-4">
+          <p class="text-xs font-medium text-zinc-400 uppercase tracking-wider mb-2">Context</p>
+          <p class="text-sm text-zinc-600">{html_mod.escape(row["context_note"])}</p>
+        </div>
+        """)
+
+    # Metadata footer
+    if meta_html or tags_html:
+        sections.append(f"""
+        <div class="flex flex-wrap items-center gap-3 pt-3 border-t border-zinc-100">
+          <span class="text-xs text-zinc-500">{meta_html}</span>
+          {f'<div class="flex flex-wrap gap-1.5">{tags_html}</div>' if tags_html else ''}
+        </div>
+        """)
+
+    return HTMLResponse("\n".join(sections))

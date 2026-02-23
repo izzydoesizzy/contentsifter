@@ -50,6 +50,23 @@ function initDropzone(dropzoneId, fileInputId) {
   dropzone.addEventListener('click', () => fileInput.click());
 }
 
+// Search result expand/collapse
+function toggleDetail(id, url) {
+  const detail = document.getElementById('detail-' + id);
+  const chevron = document.getElementById('chevron-' + id);
+  if (!detail) return;
+
+  const isExpanded = detail.classList.contains('expanded');
+  detail.classList.toggle('expanded');
+  if (chevron) chevron.classList.toggle('rotated');
+
+  // Fetch full content on first expand
+  if (!isExpanded && !detail.dataset.loaded && url) {
+    htmx.ajax('GET', url, {target: '#detail-' + id, swap: 'innerHTML'});
+    detail.dataset.loaded = 'true';
+  }
+}
+
 // Copy draft content to clipboard
 function copyDraft() {
   const el = document.getElementById('draft-content');
