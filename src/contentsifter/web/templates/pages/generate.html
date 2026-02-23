@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% block title %}Generate - {{ current_client.name }} - ContentSifter{% endblock %}
+
+{% block content %}
+<div class="mb-8">
+  <h1 class="text-2xl font-semibold text-zinc-900">Generate Content</h1>
+  <p class="mt-1 text-sm text-zinc-500">Create drafts from {{ current_client.name }}'s content bank</p>
+</div>
+
+<!-- Generation form -->
+<div class="bg-white rounded-xl border border-zinc-200 p-6 mb-6">
+  <form hx-post="/{{ current_client.slug }}/generate/draft"
+        hx-target="#draft-result"
+        hx-swap="innerHTML"
+        hx-indicator="#gen-spinner"
+        hx-timeout="120000">
+
+    <!-- Topic -->
+    <div class="mb-4">
+      <label for="topic" class="block text-sm font-medium text-zinc-700 mb-1">Topic</label>
+      <input type="text" id="topic" name="topic" required
+             placeholder="e.g., networking tips, resume writing, career change"
+             hx-get="/{{ current_client.slug }}/generate/source-preview"
+             hx-trigger="input changed delay:300ms"
+             hx-target="#source-preview"
+             hx-swap="innerHTML"
+             hx-include="#category"
+             class="w-full px-4 py-2.5 text-sm border border-zinc-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white">
+    </div>
+
+    <!-- Format + Category row -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+      <div>
+        <label for="format_type" class="block text-sm font-medium text-zinc-700 mb-1">Format</label>
+        <select id="format_type" name="format_type"
+                class="w-full px-3 py-2.5 text-sm border border-zinc-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white">
+          {% for value, label in format_options %}
+          <option value="{{ value }}">{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label for="category" class="block text-sm font-medium text-zinc-700 mb-1">Source Category</label>
+        <select id="category" name="category"
+                class="w-full px-3 py-2.5 text-sm border border-zinc-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white">
+          <option value="">All categories</option>
+          <option value="qa">Q&A</option>
+          <option value="playbook">Playbook</option>
+          <option value="story">Story</option>
+          <option value="testimonial">Testimonial</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Options row -->
+    <div class="flex flex-wrap gap-6 mb-4">
+      <label class="flex items-center gap-2 text-sm text-zinc-700 {% if not has_voice_print %}opacity-50{% endif %}">
+        <input type="checkbox" name="use_voice_print" {% if has_voice_print %}checked{% endif %}
+               {% if not has_voice_print %}disabled{% endif %}
+               class="rounded border-zinc-300 text-indigo-600 focus:ring-indigo-500">
+        Use voice print
+        {% if not has_voice_print %}
+        <span class="text-xs text-zinc-400">(not generated)</span>
+        {% endif %}
+      </label>
+      <label class="flex items-center gap-2 text-sm text-zinc-700">
+        <input type="checkbox" name="skip_gates"
+               class="rounded border-zinc-300 text-indigo-600 focus:ring-indigo-500">
+        Skip content gates
+        <span class="text-xs text-zinc-400">(faster)</span>
+      </label>
+    </div>
+
+    <!-- Source preview -->
+    <div id="source-preview" class="text-sm mb-4"></div>
+
+    <!-- Generate button -->
+    <button type="submit"
+            {% if not has_api_key %}disabled{% endif %}
+            hx-disabled-elt="this"
+            class="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+      Generate Draft
+    </button>
+
+    <div id="gen-spinner" class="htmx-indicator">
+      <div class="flex items-center gap-3 py-4 text-sm text-zinc-500">
+        <svg class="animate-spin h-5 w-5 text-indigo-500" viewBox="0 0 24 24" fill="none">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+        </svg>
+        <span>Generating draft... this takes 10-60 seconds</span>
+      </div>
+    </div>
+
+    {% if not has_api_key %}
+    <p class="text-xs text-zinc-400 mt-2">Set ANTHROPIC_API_KEY to enable content generation</p>
+    {% endif %}
+  </form>
+</div>
+
+<!-- Draft result area -->
+<div id="draft-result"></div>
+{% endblock %}

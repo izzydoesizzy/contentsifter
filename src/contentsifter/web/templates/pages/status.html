@@ -88,7 +88,7 @@
     {% for suggestion in suggestions %}
     <li class="flex items-start gap-2 text-sm text-zinc-600">
       <span class="text-indigo-500 mt-0.5">&#8226;</span>
-      {{ suggestion }}
+      {{ suggestion | safe }}
     </li>
     {% endfor %}
   </ul>

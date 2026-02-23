@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block title %}Voice Print - {{ current_client.name }} - ContentSifter{% endblock %}
+
+{% block content %}
+<div class="mb-8">
+  <h1 class="text-2xl font-semibold text-zinc-900">Voice Print</h1>
+  <p class="mt-1 text-sm text-zinc-500">Voice profile for {{ current_client.name }}</p>
+</div>
+
+<!-- Status + source data -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-8">
+  <div class="bg-white rounded-xl border border-zinc-200 p-5">
+    <p class="text-sm text-zinc-500">Status</p>
+    <p class="mt-1 text-2xl font-semibold {% if vp_exists %}text-emerald-600{% else %}text-zinc-400{% endif %}">
+      {{ "Active" if vp_exists else "None" }}
+    </p>
+    {% if vp_modified %}
+    <p class="mt-1 text-xs text-zinc-400">Updated {{ vp_modified }}</p>
+    {% endif %}
+  </div>
+
+  <div class="bg-white rounded-xl border border-zinc-200 p-5">
+    <p class="text-sm text-zinc-500">Speaker Turns</p>
+    <p class="mt-1 text-2xl font-semibold text-zinc-900">{{ "{:,}".format(coach_stats.turn_count) }}</p>
+    <p class="mt-1 text-xs text-zinc-400">{{ "{:,}".format(coach_stats.total_chars) }} chars across {{ coach_stats.call_count }} calls</p>
+  </div>
+
+  <div class="bg-white rounded-xl border border-zinc-200 p-5">
+    <p class="text-sm text-zinc-500">Content Items</p>
+    <p class="mt-1 text-2xl font-semibold text-zinc-900">{{ content_stats.item_count }}</p>
+    <p class="mt-1 text-xs text-zinc-400">{{ "{:,}".format(content_stats.total_chars) }} chars ingested</p>
+  </div>
+</div>
+
+<!-- Generate section -->
+<div class="bg-white rounded-xl border border-zinc-200 p-6 mb-6">
+  <h2 class="text-sm font-medium text-zinc-500 uppercase tracking-wider mb-4">
+    {{ "Regenerate" if vp_exists else "Generate" }} Voice Print
+  </h2>
+
+  {% if total_source == 0 %}
+  <p class="text-sm text-zinc-500 mb-3">
+    No source data available. Upload content or parse transcripts first.
+  </p>
+  <a href="/{{ current_client.slug }}/ingest"
+     class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors">
+    Upload Content
+  </a>
+  {% else %}
+  <p class="text-sm text-zinc-500 mb-4">
+    Analyzes {{ "{:,}".format(total_source) }} source items using a 3-pass LLM analysis
+    (vocabulary, structure, synthesis).
+  </p>
+
+  <div id="vp-result">
+    <form hx-post="/{{ current_client.slug }}/voice-print/generate"
+          hx-target="#vp-result"
+          hx-swap="innerHTML"
+          hx-indicator="#vp-spinner"
+          hx-timeout="120000">
+      <button type="submit"
+              {% if not has_api_key %}disabled{% endif %}
+              hx-disabled-elt="this"
+              class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+        {{ "Regenerate" if vp_exists else "Generate" }} Voice Print
+      </button>
+
+      <div id="vp-spinner" class="htmx-indicator">
+        <div class="flex items-center gap-3 py-4 text-sm text-zinc-500">
+          <svg class="animate-spin h-5 w-5 text-indigo-500" viewBox="0 0 24 24" fill="none">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+          </svg>
+          <span>Analyzing voice patterns... this takes 30-90 seconds</span>
+        </div>
+      </div>
+
+      {% if not has_api_key %}
+      <p class="text-xs text-zinc-400 mt-2">Set ANTHROPIC_API_KEY to enable voice print generation</p>
+      {% endif %}
+    </form>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Voice print preview -->
+{% if vp_exists %}
+<div class="bg-white rounded-xl border border-zinc-200 p-6">
+  <h2 class="text-sm font-medium text-zinc-500 uppercase tracking-wider mb-4">Voice Print Preview</h2>
+  <div hx-get="/{{ current_client.slug }}/voice-print/preview"
+       hx-trigger="intersect once"
+       hx-swap="innerHTML">
+    <p class="text-sm text-zinc-400">Loading preview...</p>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

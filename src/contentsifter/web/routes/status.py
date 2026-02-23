@@ -72,11 +72,11 @@ def _build_suggestions(summary: dict, pipeline: dict | None, client) -> list[str
     total_source = summary["content_items"] + summary["extractions"]
     if not summary["has_voice_print"] and total_source >= 5:
         suggestions.append(
-            f"Ready for voice print (run `contentsifter -C {client.slug} voice-print`)"
+            f'Ready for voice print — <a href="/{client.slug}/voice-print" class="text-indigo-600 hover:text-indigo-800 font-medium">generate one</a>'
         )
     elif summary["has_voice_print"] and total_source > 0:
         suggestions.append(
-            f"Generate content (run `contentsifter -C {client.slug} generate -q \"topic\" -f linkedin`)"
+            f'<a href="/{client.slug}/generate" class="text-indigo-600 hover:text-indigo-800 font-medium">Generate content</a> from your source material'
         )
 
     return suggestions

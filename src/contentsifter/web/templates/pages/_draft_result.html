@@ -1,0 +1,24 @@
+<div class="bg-white rounded-xl border border-zinc-200 overflow-hidden">
+  <div class="px-5 py-3 border-b border-zinc-100 flex items-center justify-between">
+    <div class="flex items-center gap-2">
+      <span class="badge badge-{{ format_type }}">{{ format_label }}</span>
+      <span class="text-sm text-zinc-500">{{ source_count }} source{{ "s" if source_count != 1 }} used</span>
+    </div>
+    <div class="flex items-center gap-3">
+      <button onclick="copyDraft()" class="text-xs text-indigo-600 hover:text-indigo-800 font-medium">
+        Copy
+      </button>
+      <form hx-post="/{{ current_client.slug }}/generate/save"
+            hx-target="#save-result" hx-swap="innerHTML" class="inline">
+        <input type="hidden" name="content" value="{{ draft_escaped }}">
+        <input type="hidden" name="topic" value="{{ topic }}">
+        <input type="hidden" name="format_type" value="{{ format_type }}">
+        <button type="submit" class="text-xs text-indigo-600 hover:text-indigo-800 font-medium">Save</button>
+      </form>
+    </div>
+  </div>
+  <div class="p-6">
+    <div id="draft-content" class="text-sm text-zinc-700 whitespace-pre-wrap leading-relaxed">{{ draft }}</div>
+  </div>
+  <div id="save-result" class="px-5"></div>
+</div>

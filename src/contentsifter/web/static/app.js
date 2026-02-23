@@ -49,3 +49,15 @@ function initDropzone(dropzoneId, fileInputId) {
 
   dropzone.addEventListener('click', () => fileInput.click());
 }
+
+// Copy draft content to clipboard
+function copyDraft() {
+  const el = document.getElementById('draft-content');
+  if (!el) return;
+  navigator.clipboard.writeText(el.textContent).then(() => {
+    const btn = event.target;
+    const original = btn.textContent;
+    btn.textContent = 'Copied!';
+    setTimeout(() => { btn.textContent = original; }, 1500);
+  });
+}

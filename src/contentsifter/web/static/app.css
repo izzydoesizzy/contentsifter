@@ -64,3 +64,13 @@
 .badge-blog { background: #f3e8ff; color: #7e22ce; }
 .badge-transcript { background: #f1f5f9; color: #475569; }
 .badge-other { background: #f4f4f5; color: #71717a; }
+
+/* Generation format badges */
+.badge-linkedin { background: #dbeafe; color: #1d4ed8; }
+.badge-thread { background: #e0e7ff; color: #4338ca; }
+.badge-playbook { background: #dbeafe; color: #1d4ed8; }
+.badge-video-script { background: #fef3c7; color: #b45309; }
+.badge-carousel { background: #f3e8ff; color: #7e22ce; }
+.badge-email-welcome { background: #fce7f3; color: #be185d; }
+.badge-email-weekly { background: #fce7f3; color: #be185d; }
+.badge-email-sales { background: #fce7f3; color: #be185d; }

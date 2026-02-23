@@ -219,6 +219,104 @@ class TestStatus:
         assert "0" in resp.text
 
 
+class TestRedirectFix:
+    def test_clients_no_trailing_slash(self, client):
+        """Regression: /clients must not cause redirect loop."""
+        resp = client.get("/clients", follow_redirects=False)
+        # Should redirect to /clients/ (trailing slash)
+        assert resp.status_code == 307
+        assert resp.headers["location"] == "/clients/"
+
+    def test_favicon_returns_204(self, client):
+        """Regression: /favicon.ico must not cause redirect loop."""
+        resp = client.get("/favicon.ico", follow_redirects=False)
+        assert resp.status_code == 204
+
+    def test_unknown_slug_redirects_cleanly(self, client):
+        """Unknown slug should redirect to /clients, not loop."""
+        resp = client.get("/nonexistent", follow_redirects=False)
+        assert resp.status_code == 302
+        assert "/clients" in resp.headers["location"]
+
+
+class TestVoicePrint:
+    def test_voice_print_page_loads(self, client_with_db):
+        resp = client_with_db.get("/testweb/voice-print")
+        assert resp.status_code == 200
+        assert "Voice Print" in resp.text
+
+    def test_voice_print_shows_no_print(self, client_with_db):
+        resp = client_with_db.get("/testweb/voice-print")
+        assert resp.status_code == 200
+        assert "None" in resp.text
+
+    def test_voice_print_preview_empty(self, client_with_db):
+        resp = client_with_db.get("/testweb/voice-print/preview")
+        assert resp.status_code == 200
+        assert "No voice print" in resp.text
+
+    def test_voice_print_preview_with_file(self, client_with_db, web_env_with_db):
+        content_dir = web_env_with_db / "content"
+        content_dir.mkdir(parents=True, exist_ok=True)
+        (content_dir / "voice-print.md").write_text("# Voice Print\n\nTest voice print content.")
+        resp = client_with_db.get("/testweb/voice-print/preview")
+        assert resp.status_code == 200
+        assert "Test voice print content" in resp.text
+
+    def test_generate_voice_print_no_api_key(self, client_with_db):
+        resp = client_with_db.post("/testweb/voice-print/generate")
+        assert resp.status_code == 200
+        assert "ANTHROPIC_API_KEY" in resp.text
+
+
+class TestGenerate:
+    def test_generate_page_loads(self, client_with_db):
+        resp = client_with_db.get("/testweb/generate")
+        assert resp.status_code == 200
+        assert "Generate" in resp.text
+
+    def test_generate_page_shows_formats(self, client_with_db):
+        resp = client_with_db.get("/testweb/generate")
+        assert resp.status_code == 200
+        assert "linkedin" in resp.text.lower()
+        assert "newsletter" in resp.text.lower()
+        assert "carousel" in resp.text.lower()
+
+    def test_source_preview_empty_query(self, client_with_db):
+        resp = client_with_db.get("/testweb/generate/source-preview?q=")
+        assert resp.status_code == 200
+
+    def test_source_preview_no_results(self, client_with_db):
+        resp = client_with_db.get("/testweb/generate/source-preview?q=nonexistent")
+        assert resp.status_code == 200
+        assert "No source material" in resp.text
+
+    def test_generate_draft_no_api_key(self, client_with_db):
+        resp = client_with_db.post("/testweb/generate/draft", data={
+            "topic": "networking",
+            "format_type": "linkedin",
+            "category": "",
+            "use_voice_print": "off",
+            "skip_gates": "off",
+            "limit": "10",
+        })
+        assert resp.status_code == 200
+        assert "ANTHROPIC_API_KEY" in resp.text
+
+    def test_save_draft(self, client_with_db, web_env_with_db):
+        drafts_dir = web_env_with_db / "content" / "drafts"
+        drafts_dir.mkdir(parents=True, exist_ok=True)
+        resp = client_with_db.post("/testweb/generate/save", data={
+            "content": "Test draft content here.",
+            "topic": "networking",
+            "format_type": "linkedin",
+        })
+        assert resp.status_code == 200
+        assert "Saved" in resp.text
+        saved_files = list(drafts_dir.glob("linkedin-*.md"))
+        assert len(saved_files) == 1
+
+
 class TestAutoformat:
     def test_needs_formatting_linkedin_with_dividers(self):
         from contentsifter.ingest.autoformat import needs_formatting

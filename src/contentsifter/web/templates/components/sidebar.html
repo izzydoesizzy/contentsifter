@@ -39,6 +39,22 @@
     </a>
 
     <div class="pt-3 pb-1 px-2">
+      <span class="text-xs font-medium text-zinc-400 uppercase tracking-wider">Create</span>
+    </div>
+
+    <a href="/{{ current_client.slug }}/voice-print"
+       class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm {{ 'bg-indigo-50 text-indigo-700 font-medium' if active_page == 'voice-print' else 'text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900' }}">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v3m0 0H8m4 0h4M12 18a7 7 0 007-7M5 11a7 7 0 017-7"/></svg>
+      Voice Print
+    </a>
+
+    <a href="/{{ current_client.slug }}/generate"
+       class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm {{ 'bg-indigo-50 text-indigo-700 font-medium' if active_page == 'generate' else 'text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900' }}">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+      Generate
+    </a>
+
+    <div class="pt-3 pb-1 px-2">
       <span class="text-xs font-medium text-zinc-400 uppercase tracking-wider">Interview</span>
     </div>
 
