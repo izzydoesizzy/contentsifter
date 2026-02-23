@@ -71,8 +71,9 @@ async def upload_file(
     if auto_format and request.app.state.has_api_key:
         if needs_formatting(raw_text, resolved_type):
             try:
+                from contentsifter.config import MODEL_LIGHT
                 from contentsifter.llm.client import create_client as create_llm_client
-                llm = create_llm_client("api", "claude-sonnet-4-20250514")
+                llm = create_llm_client("api", MODEL_LIGHT)
                 raw_text = auto_format_content(raw_text, resolved_type, llm)
                 formatted = True
             except Exception:

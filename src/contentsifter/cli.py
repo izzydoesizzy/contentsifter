@@ -10,6 +10,7 @@ from rich.table import Table
 from contentsifter.config import (
     DEFAULT_DB_PATH,
     DEFAULT_TRANSCRIPTS_DIR,
+    MODEL_DEFAULT,
     ClientConfig,
     create_client as create_client_config,
     list_clients as list_clients_config,
@@ -53,7 +54,7 @@ def _get_client_config(ctx) -> ClientConfig:
 )
 @click.option(
     "--model",
-    default="claude-sonnet-4-20250514",
+    default=MODEL_DEFAULT,
     help="Claude model to use",
 )
 @click.option("--verbose", "-v", is_flag=True, help="Enable debug logging")

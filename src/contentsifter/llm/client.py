@@ -9,6 +9,8 @@ import subprocess
 import time
 from dataclasses import dataclass
 
+from contentsifter.config import MODEL_DEFAULT
+
 logger = logging.getLogger(__name__)
 
 
@@ -23,7 +25,7 @@ class LLMResponse:
 class AnthropicAPIClient:
     """Direct Anthropic API client using the anthropic Python SDK."""
 
-    def __init__(self, api_key: str, model: str = "claude-sonnet-4-20250514"):
+    def __init__(self, api_key: str, model: str = MODEL_DEFAULT):
         import anthropic
 
         self.client = anthropic.Anthropic(api_key=api_key)
@@ -53,7 +55,7 @@ class ClaudeCodeClient:
     unsets the CLAUDECODE env var to allow nesting.
     """
 
-    def __init__(self, model: str = "claude-sonnet-4-20250514"):
+    def __init__(self, model: str = MODEL_DEFAULT):
         self.model = model
 
     def complete(
@@ -89,7 +91,7 @@ class CallbackClient:
     by the orchestrating code and calls the LLM directly.
     """
 
-    def __init__(self, callback, model: str = "claude-sonnet-4-20250514"):
+    def __init__(self, callback, model: str = MODEL_DEFAULT):
         self.callback = callback
         self.model = model
 
@@ -115,7 +117,7 @@ def set_callback_client(callback):
 
 
 def create_client(
-    mode: str = "auto", model: str = "claude-sonnet-4-20250514"
+    mode: str = "auto", model: str = MODEL_DEFAULT
 ) -> AnthropicAPIClient | ClaudeCodeClient | CallbackClient:
     """Factory function for creating an LLM client.
 

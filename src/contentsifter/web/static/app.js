@@ -82,16 +82,17 @@ function searchFor(term) {
   htmx.trigger(input, 'search');
 }
 
-// Copy draft content to clipboard
+// Copy draft content to clipboard (finds content within the same card)
 function copyDraft(button) {
-  const el = document.getElementById('draft-content');
+  var card = button.closest('.draft-result-card');
+  var el = card ? card.querySelector('.draft-content') : document.getElementById('draft-content');
   if (!el || !button) return;
   navigator.clipboard.writeText(el.textContent).then(() => {
     showCopyFeedback(button);
   });
 }
 
-// Shared copy feedback animation
+// Shared feedback animation (checkmark + temporary label, then restore)
 function showCopyFeedback(btn) {
   const original = btn.innerHTML;
   btn.innerHTML = '<svg class="inline w-3.5 h-3.5 -mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> Copied!';
@@ -100,6 +101,38 @@ function showCopyFeedback(btn) {
     btn.innerHTML = original;
     btn.classList.remove('success');
   }, 1500);
+}
+
+// Save draft to disk, then show checkmark and disable button
+function saveDraft(btn, slug, formatType, topic) {
+  if (btn.disabled) return;
+  btn.disabled = true;
+
+  var card = btn.closest('.draft-result-card');
+  var el = card ? card.querySelector('.draft-content') : null;
+  if (!el) { btn.disabled = false; return; }
+
+  var formData = new FormData();
+  formData.append('content', el.textContent);
+  formData.append('topic', topic);
+  formData.append('format_type', formatType);
+
+  fetch('/' + slug + '/generate/save', { method: 'POST', body: formData })
+    .then(function(resp) { return resp.text(); })
+    .then(function(html) {
+      // Show save result message in the same card
+      var target = card.querySelector('.save-result');
+      if (target) target.innerHTML = html;
+
+      // Animate button to "Saved!" and keep it disabled
+      btn.innerHTML = '<svg class="inline w-3.5 h-3.5 -mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> Saved!';
+      btn.classList.add('success');
+      btn.classList.remove('hover:text-indigo-800');
+      btn.style.cursor = 'default';
+    })
+    .catch(function() {
+      btn.disabled = false;
+    });
 }
 
 // Saved drafts: expand/collapse
@@ -305,6 +338,23 @@ function copySlotContent() {
     if (btn) showCopyFeedback(btn);
   });
 }
+
+// Planner side panel: show "Saved!" feedback after htmx save succeeds
+document.addEventListener('htmx:afterRequest', function(event) {
+  var btn = document.getElementById('planner-save-btn');
+  if (!btn || event.detail.elt !== btn.closest('form')) return;
+  if (!event.detail.successful) return;
+
+  var origHTML = btn.innerHTML;
+  btn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> Saved!';
+  btn.classList.remove('bg-indigo-600', 'hover:bg-indigo-700');
+  btn.classList.add('bg-emerald-600');
+  setTimeout(function() {
+    btn.innerHTML = origHTML;
+    btn.classList.remove('bg-emerald-600');
+    btn.classList.add('bg-indigo-600', 'hover:bg-indigo-700');
+  }, 1500);
+});
 
 // ===== Content Planner: Drafts Drawer =====
 

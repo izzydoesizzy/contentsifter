@@ -6,7 +6,8 @@ import json
 import logging
 import re
 
-from contentsifter.llm.client import complete_with_retry
+from contentsifter.config import MODEL_LIGHT
+from contentsifter.llm.client import complete_with_retry, create_client
 from contentsifter.search.filters import SearchFilters
 from contentsifter.search.keyword import keyword_search
 from contentsifter.storage.database import Database
@@ -56,13 +57,21 @@ def semantic_search(
     1. Expand query into FTS5 terms using Claude
     2. Retrieve candidates via FTS5
     3. Re-rank candidates using Claude
+
+    Uses a lightweight model (Haiku) since these are mechanical scoring tasks.
     """
     if filters is None:
         filters = SearchFilters()
 
+    # Use lightweight model for search tasks (query expansion + re-ranking)
+    try:
+        light_client = create_client(mode="auto", model=MODEL_LIGHT)
+    except Exception:
+        light_client = llm_client
+
     # Stage 1: Query expansion
     expansion_response = complete_with_retry(
-        llm_client,
+        light_client,
         system=QUERY_EXPANSION_SYSTEM,
         user=f"User query: {query}",
         max_tokens=512,
@@ -97,7 +106,7 @@ def semantic_search(
         })
 
     rerank_response = complete_with_retry(
-        llm_client,
+        light_client,
         system=RERANK_SYSTEM,
         user=f"Query: {query}\n\nResults:\n{json.dumps(candidate_summaries, indent=2)}",
         max_tokens=2048,

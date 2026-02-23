@@ -43,6 +43,11 @@ CALL_TYPE_PATTERNS = {
     "future-casting": "workshop",
 }
 
+# LLM model tiers
+MODEL_DEFAULT = "claude-sonnet-4-6"  # Default for all tasks
+MODEL_HEAVY = "claude-sonnet-4-6"  # Creative/judgment tasks (drafts, voice, extraction)
+MODEL_LIGHT = "claude-haiku-4-5-20251001"  # Mechanical/rule tasks (gates, search, format)
+
 # Processing stages
 STAGES = ["parsed", "chunked", "extracted"]
 

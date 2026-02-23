@@ -31,3 +31,6 @@ reference/
 *.egg-info/
 dist/
 build/
+
+# Coverage
+.coverage

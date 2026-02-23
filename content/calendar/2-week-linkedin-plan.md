@@ -150,7 +150,7 @@ Nobody has 100% of the qualifications. NOBODY. Not even the person who wrote the
 
 Your job isn't to have every answer. It's to show them how you think, how you learn, and what you bring.
 
-Try this: right now, think of one skill you DON'T have that keeps showing up in job postings. Then write down your closest experience. That's your redirect.
+Try this: right now, think of one skill you DON'T have that keeps showing up in job postings. Then write down your closest experience. That's how you redirect.
 
 ***
 
@@ -172,17 +172,17 @@ That's a real message from a real member of our community.
 
 Here's what happened:
 
-Sparsh applied to a role at a company he liked. They rejected him. They had a "more qualified candidate."
+My client applied to a role at a company he liked. They rejected him. They had a "more qualified candidate."
 
 Most people stop here. Delete the email. Move on. Feel crappy.
 
-Sparsh sent the post-rejection thank-you email template I share with everyone. A simple, gracious note keeping the door open.
+He sent the post-rejection thank-you email template I share with everyone. A simple, gracious note keeping the door open.
 
 They called him back and offered him the job.
 
 Let me say that again: **the company that rejected him called him back.**
 
-Why? Because most people disappear after rejection. Sparsh showed up with class. And it made him memorable.
+Why? Because most people disappear after rejection. My client stayed with it. And it made him memorable.
 
 This is why I tell every single person I work with: your job search doesn't end at rejection. Sometimes it starts there.
 
@@ -420,13 +420,13 @@ Your future self will thank you.
 
 ---
 
-Before joining ClearCareer, one of our members said:
+Before joining my program, one of my members said:
 
 "I felt really embarrassed to ask for a job or that I'm looking."
 
 He avoided telling people he was job searching. Networking felt shameful. He'd have coffee chats but never actually say what he needed.
 
-After coaching, he learned how to reframe it. Instead of "Can you help me find a job?" it became "Here's the value I bring. Here's the problems I can solve. What do you think?"
+After coaching, he learned how to reframe it. Instead of "Can you help me find a job?" it became "Here's the value I bring. Here are the problems I can solve. What do you think?"
 
 COMPLETELY different energy.
 

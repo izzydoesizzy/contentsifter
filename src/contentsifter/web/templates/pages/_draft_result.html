@@ -1,4 +1,4 @@
-<div class="bg-white rounded-xl border border-zinc-200 overflow-hidden">
+<div class="draft-result-card bg-white rounded-xl border border-zinc-200 overflow-hidden">
   <div class="px-5 py-3 border-b border-zinc-100 flex items-center justify-between">
     <div class="flex items-center gap-2">
       <span class="badge badge-{{ format_type }}">{{ format_label }}</span>
@@ -8,18 +8,12 @@
       <button onclick="copyDraft(this)" class="action-btn text-xs text-indigo-600 hover:text-indigo-800 font-medium">
         Copy
       </button>
-      <form hx-post="/{{ current_client.slug }}/generate/save"
-            hx-target="#save-result" hx-swap="innerHTML" class="inline">
-        <input type="hidden" name="content" value="{{ draft }}">
-        <input type="hidden" name="topic" value="{{ topic }}">
-        <input type="hidden" name="format_type" value="{{ format_type }}">
-        <button type="submit" class="action-btn text-xs text-indigo-600 hover:text-indigo-800 font-medium"
-                hx-disabled-elt="this">Save</button>
-      </form>
+      <button onclick="saveDraft(this, '{{ current_client.slug }}', '{{ format_type }}', '{{ topic }}')"
+              class="action-btn text-xs text-indigo-600 hover:text-indigo-800 font-medium">Save</button>
     </div>
   </div>
   <div class="p-6">
-    <div id="draft-content" class="text-sm text-zinc-700 whitespace-pre-wrap leading-relaxed">{{ draft }}</div>
+    <div class="draft-content text-sm text-zinc-700 whitespace-pre-wrap leading-relaxed">{{ draft }}</div>
   </div>
-  <div id="save-result" class="px-5"></div>
+  <div class="save-result px-5 pb-1"></div>
 </div>
