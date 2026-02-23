@@ -67,6 +67,52 @@ def client_with_db(web_env_with_db):
     return TestClient(app)
 
 
+@pytest.fixture
+def web_env_with_extractions(web_env):
+    """Web env with database containing test calls, extractions, and tags."""
+    db_path = Path(web_env / "data" / "contentsifter.db")
+    with Database(db_path) as db:
+        db.conn.execute(
+            "INSERT INTO calls (id, source_file, original_filename, title, call_date, call_type) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (1, "test.md", "test.md", "Test Call", "2025-01-15", "group_qa"),
+        )
+        db.conn.execute(
+            "INSERT INTO extractions (id, call_id, category, title, content, raw_quote, speaker, quality_score) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (1, 1, "playbook", "Networking Tips", "Build relationships first.", "Just build relationships.", "Izzy", 4),
+        )
+        db.conn.execute(
+            "INSERT INTO extractions (id, call_id, category, title, content, raw_quote, speaker, quality_score) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (2, 1, "qa", "Resume Question", "Use action verbs.", "Always use action verbs.", "Izzy", 3),
+        )
+        db.conn.execute("INSERT INTO tags (id, name) VALUES (?, ?)", (1, "networking"))
+        db.conn.execute("INSERT INTO tags (id, name) VALUES (?, ?)", (2, "resume"))
+        db.conn.execute("INSERT INTO extraction_tags (extraction_id, tag_id) VALUES (?, ?)", (1, 1))
+        db.conn.execute("INSERT INTO extraction_tags (extraction_id, tag_id) VALUES (?, ?)", (2, 2))
+        # Index for FTS
+        db.conn.execute(
+            "INSERT INTO extractions_fts (rowid, title, content, raw_quote, context_note) VALUES (?, ?, ?, ?, ?)",
+            (1, "Networking Tips", "Build relationships first.", "Just build relationships.", ""),
+        )
+        db.conn.execute(
+            "INSERT INTO extractions_fts (rowid, title, content, raw_quote, context_note) VALUES (?, ?, ?, ?, ?)",
+            (2, "Resume Question", "Use action verbs.", "Always use action verbs.", ""),
+        )
+        db.conn.commit()
+    return web_env
+
+
+@pytest.fixture
+def client_with_extractions(web_env_with_extractions):
+    """Test client with database containing extractions."""
+    from contentsifter.web.app import create_app
+
+    app = create_app()
+    return TestClient(app)
+
+
 class TestDashboard:
     def test_root_redirects(self, client):
         resp = client.get("/", follow_redirects=False)
@@ -188,6 +234,55 @@ class TestInterview:
         resp = client_with_db.get("/testweb/interview/preview")
         assert resp.status_code == 200
         assert "No questionnaire" in resp.text
+
+
+class TestInterviewPreview:
+    def test_parse_questionnaire_sections(self):
+        from contentsifter.web.routes.interview import _parse_questionnaire
+        md = (
+            "# Interview Guide\n\n## How to Use This Guide\nStuff\n\n---\n\n"
+            "## Part 1: Warmup\n*Easy questions.*\n\n"
+            "**Q1.** What is your name?\n\n"
+            "**Q2.** What do you do?\n"
+            "  - *Follow-up: What reaction do you get?*\n\n---\n\n"
+            "## Part 2: Origin\n*Your journey.*\n\n"
+            "**Q3.** How did you start?\n"
+            "  - *Follow-up: Was there a specific event?*\n\n"
+            "## You're Done!\nGreat work."
+        )
+        sections = _parse_questionnaire(md)
+        assert len(sections) == 2
+        assert sections[0]["title"] == "Part 1: Warmup"
+        assert sections[0]["description"] == "Easy questions."
+        assert len(sections[0]["questions"]) == 2
+        assert sections[0]["questions"][0]["number"] == 1
+        assert sections[0]["questions"][0]["text"] == "What is your name?"
+        assert sections[0]["questions"][0]["followups"] == []
+        assert sections[0]["questions"][1]["followups"] == ["What reaction do you get?"]
+        assert sections[1]["title"] == "Part 2: Origin"
+        assert len(sections[1]["questions"]) == 1
+
+    def test_parse_questionnaire_empty(self):
+        from contentsifter.web.routes.interview import _parse_questionnaire
+        assert _parse_questionnaire("") == []
+        assert _parse_questionnaire("Just some text") == []
+
+    def test_interview_preview_renders_table(self, client_with_db, web_env_with_db):
+        content_dir = web_env_with_db / "content"
+        content_dir.mkdir(parents=True, exist_ok=True)
+        guide = (
+            "## Part 1: Warmup\n*Easy ones.*\n\n"
+            "**Q1.** What is your name?\n\n"
+            "**Q2.** What do you do?\n"
+            "  - *Follow-up: How do people react?*\n"
+        )
+        (content_dir / "interview-guide.md").write_text(guide)
+        resp = client_with_db.get("/testweb/interview/preview")
+        assert resp.status_code == 200
+        assert "<table" in resp.text
+        assert "What is your name?" in resp.text
+        assert "How do people react?" in resp.text
+        assert "Part 1: Warmup" in resp.text
 
 
 class TestSearch:
@@ -375,6 +470,54 @@ class TestSearchDetail:
         assert "No results" in resp.text
 
 
+class TestBrowseAndSuggestions:
+    def test_browse_by_category(self, client_with_extractions):
+        """Browse playbooks with no search term."""
+        resp = client_with_extractions.get("/testweb/search/results?category=playbook")
+        assert resp.status_code == 200
+        assert "Networking Tips" in resp.text
+        assert "playbook" in resp.text.lower()
+
+    def test_browse_no_query_no_category_shows_prompt(self, client_with_db):
+        """Empty query + no category shows prompt text."""
+        resp = client_with_db.get("/testweb/search/results?q=&category=")
+        assert resp.status_code == 200
+        assert "Type to search" in resp.text or "select a category" in resp.text
+
+    def test_search_with_category_filter(self, client_with_extractions):
+        """FTS search with category filter."""
+        resp = client_with_extractions.get("/testweb/search/results?q=relationships&category=playbook")
+        assert resp.status_code == 200
+        assert "Networking Tips" in resp.text
+
+    def test_suggestions_endpoint(self, client_with_extractions):
+        """Suggestions endpoint returns popular tags."""
+        resp = client_with_extractions.get("/testweb/search/suggestions")
+        assert resp.status_code == 200
+        assert "networking" in resp.text
+        assert "resume" in resp.text
+
+    def test_suggestions_empty_db(self, client_with_db):
+        """Suggestions endpoint with no tags returns empty."""
+        resp = client_with_db.get("/testweb/search/suggestions")
+        assert resp.status_code == 200
+
+    def test_search_page_has_tabs(self, client_with_extractions):
+        """Search page shows category tabs."""
+        resp = client_with_extractions.get("/testweb/search")
+        assert resp.status_code == 200
+        assert "browse-tab" in resp.text
+        assert "Playbook" in resp.text
+
+    def test_browse_results_header(self, client_with_extractions):
+        """Browse mode shows 'N playbooks' not 'N results for'."""
+        resp = client_with_extractions.get("/testweb/search/results?category=playbook")
+        assert resp.status_code == 200
+        assert "playbook" in resp.text.lower()
+        # Should not show "results for" in browse mode
+        assert "results for" not in resp.text.lower()
+
+
 class TestAutoformat:
     def test_needs_formatting_linkedin_with_dividers(self):
         from contentsifter.ingest.autoformat import needs_formatting
@@ -406,3 +549,68 @@ class TestAutoformat:
         text = "Raw content"
         result = auto_format_content(text, "linkedin_post", None)
         assert result == text
+
+
+class TestDrafts:
+    def test_drafts_page_empty(self, client):
+        resp = client.get("/testweb/drafts")
+        assert resp.status_code == 200
+        assert "No saved drafts yet" in resp.text
+
+    def test_drafts_page_lists_files(self, web_env):
+        """Drafts page shows saved draft files."""
+        from contentsifter.web.app import create_app
+
+        drafts_dir = Path(web_env / "content" / "drafts")
+        drafts_dir.mkdir(parents=True, exist_ok=True)
+        (drafts_dir / "linkedin-20260222-120000.md").write_text(
+            "# Test Topic\n\n*Format: linkedin*\n\n---\n\nHello world draft content.\n"
+        )
+        (drafts_dir / "newsletter-20260221-100000.md").write_text(
+            "# Newsletter Topic\n\n*Format: newsletter*\n\n---\n\nNewsletter body here.\n"
+        )
+
+        app = create_app()
+        c = TestClient(app)
+        resp = c.get("/testweb/drafts")
+        assert resp.status_code == 200
+        assert "Test Topic" in resp.text
+        assert "Newsletter Topic" in resp.text
+        assert "linkedin" in resp.text
+        assert "2 saved drafts" in resp.text
+
+    def test_draft_detail_returns_body(self, web_env):
+        """Detail endpoint returns draft body content."""
+        from contentsifter.web.app import create_app
+
+        drafts_dir = Path(web_env / "content" / "drafts")
+        drafts_dir.mkdir(parents=True, exist_ok=True)
+        (drafts_dir / "test-draft.md").write_text(
+            "# My Draft\n\n*Format: linkedin*\n\n---\n\nFull body content here.\n"
+        )
+
+        app = create_app()
+        c = TestClient(app)
+        resp = c.get("/testweb/drafts/test-draft.md")
+        assert resp.status_code == 200
+        assert "Full body content here." in resp.text
+
+    def test_draft_detail_not_found(self, client):
+        resp = client.get("/testweb/drafts/nonexistent.md")
+        assert resp.status_code == 200
+        assert "not found" in resp.text.lower()
+
+    def test_delete_draft(self, web_env):
+        """Delete endpoint removes draft file."""
+        from contentsifter.web.app import create_app
+
+        drafts_dir = Path(web_env / "content" / "drafts")
+        drafts_dir.mkdir(parents=True, exist_ok=True)
+        draft_path = drafts_dir / "to-delete.md"
+        draft_path.write_text("# Delete Me\n\n*Format: linkedin*\n\n---\n\nGone.\n")
+
+        app = create_app()
+        c = TestClient(app)
+        resp = c.delete("/testweb/drafts/to-delete.md")
+        assert resp.status_code == 200
+        assert not draft_path.exists()

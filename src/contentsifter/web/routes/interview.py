@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import re
-from pathlib import Path
 
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse
@@ -12,7 +11,6 @@ from contentsifter.config import load_client
 from contentsifter.interview.generator import generate_questionnaire
 from contentsifter.web.app import templates
 from contentsifter.web.deps import get_db
-from contentsifter.web.utils import simple_md_to_html
 
 router = APIRouter()
 
@@ -90,13 +88,61 @@ async def interview_preview(request: Request, slug: str):
         return HTMLResponse('<p class="text-sm text-zinc-400 py-4">No questionnaire generated yet.</p>')
 
     content = guide_path.read_text()
-    # Simple markdown to HTML: convert headings, bold, italic, lists
-    html = simple_md_to_html(content)
+    sections = _parse_questionnaire(content)
 
-    return HTMLResponse(f"""
-    <div class="prose prose-sm max-w-none text-zinc-700 leading-relaxed">
-      {html}
-    </div>
-    """)
+    return templates.TemplateResponse("pages/_interview_preview.html", {
+        "request": request,
+        "sections": sections,
+    })
+
+
+def _parse_questionnaire(md: str) -> list[dict]:
+    """Parse interview guide markdown into structured sections.
+
+    Returns list of dicts: {title, description, questions: [{number, text, followups}]}
+    """
+    sections: list[dict] = []
+    current_section: dict | None = None
+
+    for line in md.split("\n"):
+        # New section: ## Part N: Title
+        if line.startswith("## ") and not line.startswith("## How to Use") and not line.startswith("## You're Done"):
+            if current_section:
+                sections.append(current_section)
+            current_section = {
+                "title": line.lstrip("# ").strip(),
+                "description": "",
+                "questions": [],
+            }
+            continue
+
+        if current_section is None:
+            continue
+
+        # Section description: *italic line*
+        if line.startswith("*") and line.endswith("*") and not current_section["questions"]:
+            current_section["description"] = line.strip("* ")
+            continue
+
+        # Question: **Q1.** text
+        q_match = re.match(r"\*\*Q(\d+)\.\*\*\s*(.*)", line)
+        if q_match:
+            current_section["questions"].append({
+                "number": int(q_match.group(1)),
+                "text": q_match.group(2).strip(),
+                "followups": [],
+            })
+            continue
+
+        # Follow-up:   - *Follow-up: text*
+        fu_match = re.match(r"\s+[-\*]\s*\*Follow-up:\s*(.*?)\*?\s*$", line)
+        if fu_match and current_section["questions"]:
+            current_section["questions"][-1]["followups"].append(fu_match.group(1).strip())
+            continue
+
+    if current_section:
+        sections.append(current_section)
+
+    return sections
 
 

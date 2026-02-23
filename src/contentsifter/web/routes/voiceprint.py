@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 from datetime import datetime
 
 from fastapi import APIRouter, Request
@@ -17,7 +18,7 @@ from contentsifter.planning.voiceprint import (
     save_voice_print,
 )
 from contentsifter.web.app import templates
-from contentsifter.web.deps import get_db
+from contentsifter.web.deps import get_api_key, get_db, has_api_key
 from contentsifter.web.utils import simple_md_to_html
 
 log = logging.getLogger(__name__)
@@ -54,7 +55,7 @@ async def voice_print_page(request: Request, slug: str):
         "coach_stats": coach_stats,
         "content_stats": content_stats,
         "total_source": total_source,
-        "has_api_key": request.app.state.has_api_key,
+        "has_api_key": has_api_key(client),
     })
 
 
@@ -62,23 +63,34 @@ async def voice_print_page(request: Request, slug: str):
 async def generate_voice_print(request: Request, slug: str):
     """Generate or regenerate the voice print."""
     client = load_client(slug)
+    key = get_api_key(client)
 
-    if not request.app.state.has_api_key:
+    if not key:
         return HTMLResponse(
             '<div class="rounded-lg px-4 py-3 text-sm bg-rose-50 text-rose-800 border border-rose-200">'
-            "Set ANTHROPIC_API_KEY to generate voice prints"
+            "Set an API key in client settings or ANTHROPIC_API_KEY env var"
             "</div>"
         )
 
     try:
         from contentsifter.llm.client import create_client as create_llm_client
 
-        llm = create_llm_client(mode="api")
+        # Set the key in env for the LLM client to pick up
+        old_key = os.environ.get("ANTHROPIC_API_KEY")
+        os.environ["ANTHROPIC_API_KEY"] = key
+        try:
+            llm = create_llm_client(mode="api")
 
-        with get_db(client) as db:
-            content = analyze_voice(
-                db, llm, coach_name=client.name, coach_email=client.email
-            )
+            with get_db(client) as db:
+                content = analyze_voice(
+                    db, llm, coach_name=client.name, coach_email=client.email
+                )
+        finally:
+            # Restore original env
+            if old_key is not None:
+                os.environ["ANTHROPIC_API_KEY"] = old_key
+            elif "ANTHROPIC_API_KEY" in os.environ:
+                del os.environ["ANTHROPIC_API_KEY"]
 
         save_voice_print(content, client.voice_print_path)
 

@@ -4,11 +4,11 @@
 {% block content %}
 <div class="mb-8">
   <h1 class="text-2xl font-semibold text-zinc-900">Search</h1>
-  <p class="mt-1 text-sm text-zinc-500">Search extractions from {{ current_client.name }}'s content bank</p>
+  <p class="mt-1 text-sm text-zinc-500">Search and browse extractions from {{ current_client.name }}'s content bank</p>
 </div>
 
 <!-- Search bar -->
-<div class="mb-6">
+<div class="mb-4">
   <div class="relative">
     <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
@@ -18,31 +18,49 @@
            hx-trigger="input changed delay:300ms, search"
            hx-target="#search-results"
            hx-swap="innerHTML"
-           hx-include="#category-filter"
+           hx-include="[name='category']"
            name="q"
            class="w-full pl-10 pr-4 py-3 text-sm border border-zinc-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white">
   </div>
 </div>
 
-<!-- Category filters -->
+<!-- Suggested searches -->
+<div id="suggestions"
+     hx-get="/{{ current_client.slug }}/search/suggestions"
+     hx-trigger="load"
+     hx-swap="innerHTML"></div>
+
+<!-- Category tabs -->
+{% set total = cat_counts.values()|sum %}
 <div class="flex flex-wrap gap-2 mb-6">
-  <select id="category-filter" name="category"
+  <input type="hidden" id="category-filter" name="category" value="">
+  <button type="button" class="browse-tab active"
+          onclick="selectCategory(this, '')"
           hx-get="/{{ current_client.slug }}/search/results"
-          hx-trigger="change"
           hx-target="#search-results"
           hx-swap="innerHTML"
           hx-include="#search-input"
-          class="px-3 py-1.5 text-sm border border-zinc-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white">
-    <option value="">All categories</option>
-    <option value="qa">Q&A</option>
-    <option value="playbook">Playbook</option>
-    <option value="story">Story</option>
-    <option value="testimonial">Testimonial</option>
-  </select>
+          hx-vals='{"category": ""}'>
+    All <span class="opacity-60">({{ total }})</span>
+  </button>
+  {% for cat, label in cat_labels.items() %}
+  {% set cnt = cat_counts.get(cat, 0) %}
+  {% if cnt > 0 %}
+  <button type="button" class="browse-tab"
+          onclick="selectCategory(this, '{{ cat }}')"
+          hx-get="/{{ current_client.slug }}/search/results"
+          hx-target="#search-results"
+          hx-swap="innerHTML"
+          hx-include="#search-input"
+          hx-vals='{"category": "{{ cat }}"}'>
+    {{ label }} <span class="opacity-60">({{ cnt }})</span>
+  </button>
+  {% endif %}
+  {% endfor %}
 </div>
 
 <!-- Results -->
 <div id="search-results">
-  <p class="text-sm text-zinc-400 py-4">Type to search...</p>
+  <p class="text-sm text-zinc-400 py-4">Type to search or select a category to browse.</p>
 </div>
 {% endblock %}

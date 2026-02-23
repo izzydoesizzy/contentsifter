@@ -4,7 +4,7 @@
 {% block content %}
 <div class="mb-8">
   <div class="flex items-center gap-3 mb-1">
-    <a href="/clients" class="text-sm text-zinc-400 hover:text-zinc-600">&larr; Clients</a>
+    <a href="/clients/" class="text-sm text-zinc-400 hover:text-zinc-600">&larr; Clients</a>
   </div>
   <h1 class="text-2xl font-semibold text-zinc-900">{{ client.name }}</h1>
   <p class="mt-1 text-sm text-zinc-500">{{ client.slug }}{% if client.email %} &middot; {{ client.email }}{% endif %}</p>
@@ -20,17 +20,47 @@
     </div>
     <div>
       <dt class="text-zinc-400">Email</dt>
-      <dd class="text-zinc-900">{{ client.email or "—" }}</dd>
+      <dd class="text-zinc-900">{{ client.email or "&mdash;" }}</dd>
     </div>
     <div>
       <dt class="text-zinc-400">Description</dt>
-      <dd class="text-zinc-900">{{ client.description or "—" }}</dd>
+      <dd class="text-zinc-900">{{ client.description or "&mdash;" }}</dd>
     </div>
     <div>
       <dt class="text-zinc-400">Database</dt>
       <dd class="text-zinc-900 text-xs font-mono">{{ client.db_path }}</dd>
     </div>
   </dl>
+</div>
+
+<!-- API Key -->
+<div class="bg-white rounded-xl border border-zinc-200 p-6 mb-6">
+  <h2 class="text-sm font-medium text-zinc-500 uppercase tracking-wider mb-4">API Key</h2>
+  <p class="text-sm text-zinc-500 mb-4">
+    Set an Anthropic API key for this client. Used for voice print generation, content drafting, and other AI features.
+  </p>
+  <div id="api-key-result"></div>
+  <form hx-post="/clients/{{ client.slug }}/settings"
+        hx-target="#api-key-result"
+        hx-swap="innerHTML"
+        class="flex items-end gap-3">
+    <div class="flex-1">
+      <label class="block text-xs font-medium text-zinc-500 mb-1">ANTHROPIC_API_KEY</label>
+      <input type="password" name="api_key"
+             value="{{ client.api_key }}"
+             placeholder="sk-ant-api03-..."
+             class="w-full px-3 py-2 text-sm font-mono border border-zinc-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+    </div>
+    <button type="submit"
+            class="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors shrink-0">
+      Save Key
+    </button>
+  </form>
+  {% if client.api_key %}
+  <p class="text-xs text-emerald-600 mt-2">Key is set ({{ client.api_key[:7] }}...{{ client.api_key[-4:] }})</p>
+  {% else %}
+  <p class="text-xs text-zinc-400 mt-2">No key set. Falls back to ANTHROPIC_API_KEY environment variable.</p>
+  {% endif %}
 </div>
 
 <!-- Stats -->

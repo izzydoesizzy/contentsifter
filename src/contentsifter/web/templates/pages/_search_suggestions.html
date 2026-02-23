@@ -1,0 +1,12 @@
+<div class="mb-5">
+  <p class="text-xs font-medium text-zinc-400 uppercase tracking-wider mb-2">Popular topics</p>
+  <div class="flex flex-wrap gap-1.5">
+    {% for tag in tags %}
+    <button type="button" class="suggestion-chip"
+            onclick="searchFor('{{ tag.name }}')">
+      {{ tag.name|replace("_", " ") }}
+      <span class="opacity-50">{{ tag.count }}</span>
+    </button>
+    {% endfor %}
+  </div>
+</div>

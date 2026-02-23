@@ -10,6 +10,7 @@ def register_routes(app: FastAPI):
     from contentsifter.web.routes import (
         clients,
         dashboard,
+        drafts,
         generate,
         ingest,
         interview,
@@ -20,6 +21,7 @@ def register_routes(app: FastAPI):
 
     # Specific routes first — dashboard catch-all /{slug} must be last
     app.include_router(clients.router, prefix="/clients")
+    app.include_router(drafts.router)
     app.include_router(ingest.router)
     app.include_router(interview.router)
     app.include_router(search.router)

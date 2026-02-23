@@ -29,17 +29,19 @@ to the draft.
 
 Rules:
 - Remove or replace every banned word and phrase from the reference
-- ZERO em dashes (—) allowed. Replace every single one with a period, comma, colon, or parentheses
+- ZERO em dashes (—) or en dashes (–) allowed. Replace every single one with a period, comma, colon, or parentheses
+- ZERO markdown asterisks (**bold** or *italic*). Remove all asterisks. Use CAPS for emphasis instead (e.g., "this is HUGE" not "this is **huge**")
+- Emoji: remove most emoji. Only keep ❌ and ✅ when used as list bullet points. Remove all other emoji (💪 ✨ 🚀 🔥 etc.)
 - Kill all hedging language. Be direct
 - Replace five-dollar words with simple ones ("use" not "utilize", "help" not "empower")
-- Break up uniform list formatting — vary sentence length
+- Break up uniform list formatting. Vary sentence length
 - Remove formulaic openings and closings
 - Cut filler phrases that add nothing
 - Use active voice throughout
 - Keep the SAME content, meaning, structure, and approximate length
 - Do NOT add new information or change the message
 - Do NOT add commentary or notes — return ONLY the rewritten draft
-- Preserve all emoji, formatting (bold, caps, line breaks), and hashtags exactly as they are"""
+- Preserve CAPS emphasis, line breaks, and hashtags"""
 
 VOICE_GATE_SYSTEM = """\
 You are a voice-matching editor. Your ONLY job is to rewrite the draft so it \
@@ -104,20 +106,52 @@ def run_voice_gate(draft: str, llm_client, voice_print: str | None = None) -> st
     return response.content
 
 
+def _hard_cleanup(text: str) -> str:
+    """Regex backstop: catch anything the LLM gates missed.
+
+    Runs after all LLM gates. Handles em dashes, asterisks, and decorative emoji
+    that the LLM sometimes preserves despite instructions.
+    """
+    import re
+
+    # Em dashes → period + space
+    text = text.replace("—", ". ")
+    text = text.replace("–", ". ")
+    # Clean up double periods or period-comma from replacement
+    text = re.sub(r"\.\s*\.", ".", text)
+    text = re.sub(r"\.\s*,", ",", text)
+
+    # Strip markdown bold/italic asterisks (preserve ❌ ✅ list bullets)
+    text = re.sub(r"\*{1,3}(.+?)\*{1,3}", r"\1", text)
+
+    # Strip decorative emoji (keep ❌ ✅ only)
+    text = re.sub(r"[^\S\n]*[🚀💪✨🔥💡🎯🙌👏👇👆🤔💰🎉🏆🌟⭐💥🔑📌🙏❤️🤝💼📈🧠👀🎁💎🫶🤷‍♀️🤷‍♂️🤷]+[^\S\n]*", "", text)
+
+    # Clean up leftover whitespace
+    text = re.sub(r" {2,}", " ", text)
+    text = re.sub(r"\n{3,}", "\n\n", text)
+
+    return text.strip()
+
+
 def run_content_gates(
     draft: str,
     llm_client,
     voice_print: str | None = None,
     ai_gate_doc: str | None = None,
 ) -> str:
-    """Run both content gates in sequence: AI gate first, then voice gate.
+    """Run content gates in sequence: AI gate → voice gate → hard cleanup.
 
     Returns the final gated draft.
     """
     log.info("Running AI gate...")
     gated = run_ai_gate(draft, llm_client, ai_gate_doc=ai_gate_doc)
 
-    log.info("Running voice gate...")
-    gated = run_voice_gate(gated, llm_client, voice_print=voice_print)
+    if voice_print:
+        log.info("Running voice gate...")
+        gated = run_voice_gate(gated, llm_client, voice_print=voice_print)
+
+    log.info("Running hard cleanup...")
+    gated = _hard_cleanup(gated)
 
     return gated

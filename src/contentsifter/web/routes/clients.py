@@ -10,6 +10,7 @@ from contentsifter.config import (
     list_clients,
     load_client,
     set_default_client,
+    update_client,
 )
 from contentsifter.web.app import templates
 from contentsifter.web.deps import content_summary, get_db
@@ -49,13 +50,13 @@ async def clients_create(
                 "flash_message": f"Client '{name}' created",
                 "flash_level": "success",
             })
-        return RedirectResponse("/clients", status_code=303)
+        return RedirectResponse("/clients/", status_code=303)
     except ValueError as e:
         if request.headers.get("HX-Request"):
             return HTMLResponse(
                 f'<div class="rounded-lg px-4 py-3 text-sm bg-rose-50 text-rose-800 border border-rose-200 mb-4">{e}</div>',
             )
-        return RedirectResponse("/clients", status_code=303)
+        return RedirectResponse("/clients/", status_code=303)
 
 
 @router.get("/{slug}")
@@ -64,7 +65,7 @@ async def client_detail(request: Request, slug: str):
     try:
         client = load_client(slug)
     except ValueError:
-        return RedirectResponse("/clients", status_code=302)
+        return RedirectResponse("/clients/", status_code=302)
 
     with get_db(client) as db:
         summary = content_summary(db, client)
@@ -92,3 +93,34 @@ async def set_default(request: Request, slug: str):
             headers={"HX-Redirect": f"/clients/{slug}"},
         )
     return RedirectResponse(f"/clients/{slug}", status_code=303)
+
+
+@router.post("/{slug}/settings")
+async def update_settings(
+    request: Request,
+    slug: str,
+    api_key: str = Form(""),
+):
+    """Update client settings (API key)."""
+    try:
+        client = update_client(slug, api_key=api_key)
+    except ValueError:
+        return RedirectResponse("/clients/", status_code=302)
+
+    if request.headers.get("HX-Request"):
+        # Mask the key for display
+        masked = _mask_key(api_key)
+        return HTMLResponse(f"""
+        <div class="rounded-lg px-4 py-3 text-sm bg-emerald-50 text-emerald-800 border border-emerald-200 mb-4" data-flash>
+          API key updated{f' ({masked})' if api_key else ' (cleared)'}
+        </div>
+        """)
+
+    return RedirectResponse(f"/clients/{slug}", status_code=303)
+
+
+def _mask_key(key: str) -> str:
+    """Mask an API key for display: sk-ant-...xxxx."""
+    if not key or len(key) < 12:
+        return "****"
+    return key[:7] + "..." + key[-4:]

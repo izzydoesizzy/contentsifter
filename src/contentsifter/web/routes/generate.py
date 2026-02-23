@@ -9,12 +9,14 @@ from datetime import datetime
 from fastapi import APIRouter, Form, Query, Request
 from fastapi.responses import HTMLResponse
 
+import os
+
 from contentsifter.config import load_client
 from contentsifter.planning.voiceprint import load_voice_print
 from contentsifter.search.filters import SearchFilters
 from contentsifter.search.keyword import keyword_search
 from contentsifter.web.app import templates
-from contentsifter.web.deps import get_db
+from contentsifter.web.deps import get_api_key, get_db, has_api_key
 
 log = logging.getLogger(__name__)
 
@@ -44,7 +46,7 @@ async def generate_page(request: Request, slug: str):
         "current_client": client,
         "active_page": "generate",
         "format_options": FORMAT_OPTIONS,
-        "has_api_key": request.app.state.has_api_key,
+        "has_api_key": has_api_key(client),
         "has_voice_print": has_voice_print,
     })
 
@@ -63,10 +65,11 @@ async def generate_draft_endpoint(
     """Generate a content draft."""
     client = load_client(slug)
 
-    if not request.app.state.has_api_key:
+    key = get_api_key(client)
+    if not key:
         return HTMLResponse(
             '<div class="rounded-lg px-4 py-3 text-sm bg-rose-50 text-rose-800 border border-rose-200">'
-            "Set ANTHROPIC_API_KEY to generate content"
+            "Set an API key in client settings or ANTHROPIC_API_KEY env var"
             "</div>"
         )
 
@@ -98,15 +101,24 @@ async def generate_draft_endpoint(
         from contentsifter.generate.drafts import generate_draft
         from contentsifter.llm.client import create_client as create_llm_client
 
-        llm = create_llm_client(mode="api")
-        draft = generate_draft(
-            results=results,
-            format_type=format_type,
-            llm_client=llm,
-            topic=topic,
-            voice_print=voice_print,
-            skip_gates=(skip_gates == "on"),
-        )
+        # Set client-specific key for LLM
+        old_key = os.environ.get("ANTHROPIC_API_KEY")
+        os.environ["ANTHROPIC_API_KEY"] = key
+        try:
+            llm = create_llm_client(mode="api")
+            draft = generate_draft(
+                results=results,
+                format_type=format_type,
+                llm_client=llm,
+                topic=topic,
+                voice_print=voice_print,
+                skip_gates=(skip_gates == "on"),
+            )
+        finally:
+            if old_key is not None:
+                os.environ["ANTHROPIC_API_KEY"] = old_key
+            elif "ANTHROPIC_API_KEY" in os.environ:
+                del os.environ["ANTHROPIC_API_KEY"]
 
         # Find the display name for the format
         format_label = dict(FORMAT_OPTIONS).get(format_type, format_type)

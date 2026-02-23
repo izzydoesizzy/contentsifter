@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 
 from contentsifter.generate.drafts import format_source_material, _inject_voice_context
+from contentsifter.generate.gates import _hard_cleanup
 from contentsifter.generate.templates import TEMPLATES
 
 
@@ -86,3 +87,59 @@ class TestInjectVoiceContext:
         result = _inject_voice_context(system, None)
         assert "{voice_context}" not in result
         assert "voice" not in result.lower() or "voice_context" not in result
+
+
+class TestHardCleanup:
+    def test_removes_em_dashes(self):
+        result = _hard_cleanup("work — life")
+        assert "—" not in result
+        assert "work" in result and "life" in result
+
+    def test_removes_en_dashes(self):
+        result = _hard_cleanup("work – life")
+        assert "–" not in result
+        assert "work" in result and "life" in result
+
+    def test_no_double_periods(self):
+        result = _hard_cleanup("end.— start")
+        assert ".." not in result
+
+    def test_strips_bold_asterisks(self):
+        assert _hard_cleanup("this is **important**") == "this is important"
+
+    def test_strips_italic_asterisks(self):
+        assert _hard_cleanup("this is *important*") == "this is important"
+
+    def test_strips_bold_italic_asterisks(self):
+        assert _hard_cleanup("***wow***") == "wow"
+
+    def test_removes_decorative_emoji(self):
+        result = _hard_cleanup("Great job 🚀💪✨🔥")
+        assert "🚀" not in result
+        assert "💪" not in result
+        assert "✨" not in result
+        assert "🔥" not in result
+
+    def test_preserves_checkmark_and_x_emoji(self):
+        result = _hard_cleanup("✅ Good\n❌ Bad")
+        assert "✅" in result
+        assert "❌" in result
+
+    def test_collapses_extra_whitespace(self):
+        assert "a b" in _hard_cleanup("a     b")
+
+    def test_collapses_extra_newlines(self):
+        result = _hard_cleanup("a\n\n\n\n\nb")
+        assert "\n\n\n" not in result
+        assert "a\n\nb" == result
+
+    def test_full_draft_cleanup(self):
+        draft = "**5 Tips** for your career 💪\n\nFirst — know yourself.\nSecond — network 🚀.\n\n\n\n✅ Do this\n❌ Not that"
+        result = _hard_cleanup(draft)
+        assert "**" not in result
+        assert "—" not in result
+        assert "💪" not in result
+        assert "🚀" not in result
+        assert "✅" in result
+        assert "❌" in result
+        assert "\n\n\n" not in result

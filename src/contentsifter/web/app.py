@@ -15,6 +15,14 @@ STATIC_DIR = WEB_DIR / "static"
 
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
+# Register template globals after import
+def _setup_template_globals():
+    from contentsifter.config import list_clients
+
+    templates.env.globals["list_all_clients"] = list_clients
+
+_setup_template_globals()
+
 
 def create_app() -> FastAPI:
     """Create and configure the FastAPI application."""

@@ -67,6 +67,21 @@ function toggleDetail(id, url) {
   }
 }
 
+// Category tab switching
+function selectCategory(button, category) {
+  document.querySelectorAll('.browse-tab').forEach(b => b.classList.remove('active'));
+  button.classList.add('active');
+  document.getElementById('category-filter').value = category;
+}
+
+// Fill search input from suggestion chip and trigger search
+function searchFor(term) {
+  const input = document.getElementById('search-input');
+  if (!input) return;
+  input.value = term;
+  htmx.trigger(input, 'search');
+}
+
 // Copy draft content to clipboard
 function copyDraft() {
   const el = document.getElementById('draft-content');
@@ -77,4 +92,37 @@ function copyDraft() {
     btn.textContent = 'Copied!';
     setTimeout(() => { btn.textContent = original; }, 1500);
   });
+}
+
+// Saved drafts: expand/collapse
+function toggleDraft(id, url) {
+  const detail = document.getElementById('draft-detail-' + id);
+  const chevron = document.getElementById('draft-chevron-' + id);
+  if (!detail) return;
+
+  const isExpanded = detail.classList.contains('expanded');
+  detail.classList.toggle('expanded');
+  if (chevron) chevron.classList.toggle('rotated');
+
+  if (!isExpanded && !detail.dataset.loaded && url) {
+    htmx.ajax('GET', url, {target: '#draft-detail-' + id, swap: 'innerHTML'});
+    detail.dataset.loaded = 'true';
+  }
+}
+
+// Saved drafts: copy body from expanded detail
+function copyDraftBody(id) {
+  const detail = document.getElementById('draft-detail-' + id);
+  if (!detail || !detail.dataset.loaded) return;
+  const textEl = detail.querySelector('.whitespace-pre-wrap');
+  if (!textEl) return;
+  navigator.clipboard.writeText(textEl.textContent).then(() => {
+    // Flash feedback handled inline
+  });
+}
+
+// Saved drafts: delete
+function deleteDraft(id, slug, filename) {
+  if (!confirm('Delete this draft?')) return;
+  htmx.ajax('DELETE', '/' + slug + '/drafts/' + filename, {target: '#draft-' + id, swap: 'outerHTML'});
 }

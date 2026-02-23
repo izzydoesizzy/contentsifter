@@ -9,7 +9,7 @@ from fastapi.responses import HTMLResponse
 
 from contentsifter.config import load_client
 from contentsifter.search.filters import SearchFilters
-from contentsifter.search.keyword import keyword_search
+from contentsifter.search.keyword import browse_extractions, keyword_search
 from contentsifter.web.app import templates
 from contentsifter.web.deps import get_db
 from contentsifter.web.utils import simple_md_to_html
@@ -17,14 +17,44 @@ from contentsifter.web.utils import simple_md_to_html
 router = APIRouter()
 
 
+CATEGORY_LABELS = {
+    "qa": "Q&A",
+    "playbook": "Playbook",
+    "story": "Story",
+    "testimonial": "Testimonial",
+}
+
+CATEGORY_PLURALS = {
+    "qa": "Q&As",
+    "playbook": "playbooks",
+    "story": "stories",
+    "testimonial": "testimonials",
+}
+
+
 @router.get("/{slug}/search")
 async def search_page(request: Request, slug: str):
-    """Search page with live search."""
+    """Search page with live search and browse."""
     client = load_client(slug)
+
+    # Get category counts for tabs
+    cat_counts = {}
+    with get_db(client) as db:
+        try:
+            rows = db.conn.execute(
+                "SELECT category, COUNT(*) as cnt FROM extractions GROUP BY category"
+            ).fetchall()
+            for r in rows:
+                cat_counts[r["category"]] = r["cnt"]
+        except Exception:
+            pass
+
     return templates.TemplateResponse("pages/search.html", {
         "request": request,
         "current_client": client,
         "active_page": "search",
+        "cat_counts": cat_counts,
+        "cat_labels": CATEGORY_LABELS,
     })
 
 
@@ -38,23 +68,37 @@ async def search_results(
     """Return search results as HTML fragment (htmx)."""
     client = load_client(slug)
 
-    if not q.strip():
-        return HTMLResponse('<p class="text-sm text-zinc-400 py-4">Type to search...</p>')
+    has_query = bool(q.strip())
+    has_category = bool(category)
+
+    if not has_query and not has_category:
+        return HTMLResponse(
+            '<p class="text-sm text-zinc-400 py-4">Type to search or select a category to browse.</p>'
+        )
 
     filters = SearchFilters()
-    if category:
+    if has_category:
         filters.categories = [category]
 
     with get_db(client) as db:
         try:
-            results = keyword_search(db, q, filters)
+            if has_query:
+                results = keyword_search(db, q, filters)
+            else:
+                # Browse mode: no search term, filter by category
+                results = browse_extractions(db, filters)
         except Exception:
             results = []
 
     if not results:
-        return HTMLResponse(
-            f'<p class="text-sm text-zinc-400 py-4">No results for &ldquo;{q}&rdquo;</p>'
-        )
+        label = CATEGORY_LABELS.get(category, category) if has_category else ""
+        if has_query:
+            msg = f'No results for &ldquo;{html_mod.escape(q)}&rdquo;'
+            if label:
+                msg += f" in {label}"
+        else:
+            msg = f"No {label} extractions found" if label else "No extractions found"
+        return HTMLResponse(f'<p class="text-sm text-zinc-400 py-4">{msg}</p>')
 
     # Build display-ready results with snippet
     display_results = []
@@ -66,11 +110,19 @@ async def search_results(
             "snippet": snippet,
         })
 
+    # Header context
+    mode = "search" if has_query else "browse"
+    category_label = CATEGORY_LABELS.get(category, "") if has_category else ""
+    category_plural = CATEGORY_PLURALS.get(category, "extractions") if has_category else "extractions"
+
     return templates.TemplateResponse("pages/_search_results.html", {
         "request": request,
         "results": display_results,
         "query": q,
         "slug": slug,
+        "mode": mode,
+        "category_label": category_label,
+        "category_plural": category_plural,
     })
 
 
@@ -168,3 +220,31 @@ async def search_detail(request: Request, slug: str, extraction_id: int):
         """)
 
     return HTMLResponse("\n".join(sections))
+
+
+@router.get("/{slug}/search/suggestions")
+async def search_suggestions(request: Request, slug: str):
+    """Return popular tags as clickable suggestion chips."""
+    client = load_client(slug)
+
+    popular_tags: list[dict] = []
+    with get_db(client) as db:
+        try:
+            rows = db.conn.execute(
+                """SELECT t.name, COUNT(*) as cnt FROM tags t
+                   JOIN extraction_tags et ON t.id = et.tag_id
+                   GROUP BY t.id
+                   ORDER BY cnt DESC
+                   LIMIT 15"""
+            ).fetchall()
+            popular_tags = [{"name": r["name"], "count": r["cnt"]} for r in rows]
+        except Exception:
+            pass
+
+    if not popular_tags:
+        return HTMLResponse("")
+
+    return templates.TemplateResponse("pages/_search_suggestions.html", {
+        "request": request,
+        "tags": popular_tags,
+    })

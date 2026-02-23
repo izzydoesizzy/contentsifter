@@ -55,6 +55,7 @@ class ClientConfig:
     name: str
     email: str = ""
     description: str = ""
+    api_key: str = ""
     db_path: Path = field(default_factory=lambda: DEFAULT_DB_PATH)
     content_dir: Path = field(default_factory=lambda: CONTENT_DIR)
 
@@ -113,6 +114,7 @@ def load_client(slug: str | None = None) -> ClientConfig:
             name=entry["name"],
             email=entry.get("email", ""),
             description=entry.get("description", ""),
+            api_key=entry.get("api_key", ""),
             db_path=PROJECT_ROOT / entry["db_path"],
             content_dir=PROJECT_ROOT / entry["content_dir"],
         )
@@ -182,6 +184,22 @@ def create_client(slug: str, name: str, email: str = "", description: str = "") 
     )
     config.ensure_dirs()
     return config
+
+
+def update_client(slug: str, **kwargs) -> ClientConfig:
+    """Update fields on an existing client. Accepts: name, email, description, api_key."""
+    registry = _load_registry()
+    clients = registry.get("clients", {})
+    if slug not in clients:
+        raise ValueError(f"Unknown client: {slug}")
+
+    allowed = {"name", "email", "description", "api_key"}
+    for key, value in kwargs.items():
+        if key in allowed:
+            clients[slug][key] = value
+
+    _save_registry(registry)
+    return load_client(slug)
 
 
 def set_default_client(slug: str):

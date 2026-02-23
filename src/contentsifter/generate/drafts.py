@@ -81,8 +81,8 @@ def generate_draft(
 
     draft = response.content
 
-    # Run content gates (AI detection + voice matching)
-    if not skip_gates and voice_print:
+    # Run content gates (AI detection + voice matching + hard cleanup)
+    if not skip_gates:
         log.info("Running content gates on %s draft...", format_type)
         ai_gate_doc = load_ai_gate()
         draft = run_content_gates(

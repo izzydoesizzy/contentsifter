@@ -1,4 +1,8 @@
-<p class="text-xs text-zinc-400 mb-4">{{ results|length }} result{{ "s" if results|length != 1 else "" }} for &ldquo;{{ query }}&rdquo;</p>
+{% if mode == "browse" %}
+<p class="text-xs text-zinc-400 mb-4">{{ results|length }} {{ category_plural|default("extractions") }}</p>
+{% else %}
+<p class="text-xs text-zinc-400 mb-4">{{ results|length }} result{{ "s" if results|length != 1 else "" }} for &ldquo;{{ query }}&rdquo;{% if category_label %} in {{ category_label }}{% endif %}</p>
+{% endif %}
 
 <div class="space-y-3">
 {% for r in results %}

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from contextlib import contextmanager
 from pathlib import Path
 
@@ -31,6 +32,16 @@ def get_db(client: ClientConfig):
 def get_repo(db: Database) -> Repository:
     """Create a repository for database operations."""
     return Repository(db)
+
+
+def get_api_key(client: ClientConfig) -> str:
+    """Get the API key for a client: client-specific key, then env var fallback."""
+    return client.api_key or os.environ.get("ANTHROPIC_API_KEY", "")
+
+
+def has_api_key(client: ClientConfig) -> bool:
+    """Check if an API key is available for a client."""
+    return bool(get_api_key(client))
 
 
 def content_summary(db: Database, client: ClientConfig) -> dict:
