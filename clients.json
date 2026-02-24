@@ -7,7 +7,7 @@
       "db_path": "data/contentsifter.db",
       "content_dir": "content",
       "description": "ClearCareer career coaching",
-      "api_key": "REDACTED_API_KEY"
+      "api_key": "${ANTHROPIC_API_KEY}"
     },
     "aileen-edwards": {
       "name": "Aileen Edwards",
