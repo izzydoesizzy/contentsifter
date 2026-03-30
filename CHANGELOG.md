@@ -48,3 +48,6 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 ## Activity Log
 
 > Auto-generated commit log. Curated changelog entries are above.
+
+### 2026-03-30
+- Add content_blocks schema, dataclass, and staging scripts (`3fddcba`, 5 files)
