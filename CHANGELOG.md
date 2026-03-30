@@ -50,5 +50,6 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 > Auto-generated commit log. Curated changelog entries are above.
 
 ### 2026-03-30
+- chore: update changelog (`8deb512`, 1 files)
 - chore: update changelog (`9b8ee4d`, 1 files)
 - Add content_blocks schema, dataclass, and staging scripts (`3fddcba`, 5 files)
