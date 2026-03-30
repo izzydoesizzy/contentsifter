@@ -64,6 +64,24 @@ class Extraction:
 
 
 @dataclass
+class ContentBlock:
+    source_type: str
+    category: str
+    title: str
+    full_text: str
+    summary: Optional[str] = None
+    raw_quote: Optional[str] = None
+    speaker: Optional[str] = None
+    quality_score: int = 0
+    word_count: int = 0
+    tags: list[str] = field(default_factory=list)
+    context: Optional[dict] = None
+    call_id: Optional[int] = None
+    chunk_id: Optional[int] = None
+    content_item_id: Optional[int] = None
+
+
+@dataclass
 class SearchResult:
     extraction_id: int
     category: str

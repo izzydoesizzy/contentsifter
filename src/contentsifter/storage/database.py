@@ -5,7 +5,7 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 SCHEMA_SQL = """
 -- Individual coaching calls parsed from merged markdown files
@@ -229,6 +229,67 @@ CREATE TABLE IF NOT EXISTS calendar_plans (
     UNIQUE(week_start, day_name)
 );
 CREATE INDEX IF NOT EXISTS idx_calendar_plans_week ON calendar_plans(week_start);
+
+-- Full-text content blocks (extracted with full original text preserved)
+CREATE TABLE IF NOT EXISTS content_blocks (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    source_type     TEXT NOT NULL,
+    call_id         INTEGER REFERENCES calls(id) ON DELETE CASCADE,
+    chunk_id        INTEGER REFERENCES topic_chunks(id) ON DELETE SET NULL,
+    content_item_id INTEGER REFERENCES content_items(id) ON DELETE CASCADE,
+    category        TEXT NOT NULL,
+    title           TEXT NOT NULL,
+    full_text       TEXT NOT NULL,
+    summary         TEXT,
+    raw_quote       TEXT,
+    speaker         TEXT,
+    quality_score   INTEGER DEFAULT 0,
+    word_count      INTEGER DEFAULT 0,
+    context_json    TEXT,
+    is_reviewed     INTEGER DEFAULT 0,
+    created_at      TEXT DEFAULT CURRENT_TIMESTAMP,
+    updated_at      TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS content_block_tags (
+    content_block_id INTEGER NOT NULL REFERENCES content_blocks(id) ON DELETE CASCADE,
+    tag_id           INTEGER NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
+    PRIMARY KEY (content_block_id, tag_id)
+);
+
+CREATE VIRTUAL TABLE IF NOT EXISTS content_blocks_fts USING fts5(
+    title,
+    full_text,
+    summary,
+    raw_quote,
+    content=content_blocks,
+    content_rowid=id,
+    tokenize='porter unicode61'
+);
+
+CREATE TRIGGER IF NOT EXISTS content_blocks_ai AFTER INSERT ON content_blocks BEGIN
+    INSERT INTO content_blocks_fts(rowid, title, full_text, summary, raw_quote)
+    VALUES (new.id, new.title, new.full_text, new.summary, new.raw_quote);
+END;
+
+CREATE TRIGGER IF NOT EXISTS content_blocks_ad AFTER DELETE ON content_blocks BEGIN
+    INSERT INTO content_blocks_fts(content_blocks_fts, rowid, title, full_text, summary, raw_quote)
+    VALUES ('delete', old.id, old.title, old.full_text, old.summary, old.raw_quote);
+END;
+
+CREATE TRIGGER IF NOT EXISTS content_blocks_au AFTER UPDATE ON content_blocks BEGIN
+    INSERT INTO content_blocks_fts(content_blocks_fts, rowid, title, full_text, summary, raw_quote)
+    VALUES ('delete', old.id, old.title, old.full_text, old.summary, old.raw_quote);
+    INSERT INTO content_blocks_fts(rowid, title, full_text, summary, raw_quote)
+    VALUES (new.id, new.title, new.full_text, new.summary, new.raw_quote);
+END;
+
+CREATE INDEX IF NOT EXISTS idx_content_blocks_source ON content_blocks(source_type);
+CREATE INDEX IF NOT EXISTS idx_content_blocks_category ON content_blocks(category);
+CREATE INDEX IF NOT EXISTS idx_content_blocks_call ON content_blocks(call_id);
+CREATE INDEX IF NOT EXISTS idx_content_blocks_chunk ON content_blocks(chunk_id);
+CREATE INDEX IF NOT EXISTS idx_content_blocks_quality ON content_blocks(quality_score);
+CREATE INDEX IF NOT EXISTS idx_content_block_tags_tag ON content_block_tags(tag_id);
 """
 
 
