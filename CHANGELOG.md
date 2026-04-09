@@ -50,6 +50,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 > Auto-generated commit log. Curated changelog entries are above.
 
 ### 2026-04-01
+- Activity log and work log updates (`ac7226b`, 1 files)
 - chore: update CHANGELOG (`768a099`, 1 files)
 
 ### 2026-03-30
